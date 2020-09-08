@@ -18,7 +18,11 @@ paths:
   /gophers:
     post:
       summary: Track a new gopher
-      description: When you find a new gopher, add it to the list with this endpoint. Keeping track of gophers helps the community know where they are and where not to plant their garden.
+      description: |
+        ### Finding a new Gopher
+
+        When you find a new gopher, add it to the list with this endpoint. Keeping track of gophers
+        helps the community know where they are and where not to plant their garden.
       tags:
         - Gophers
       requestBody:
