@@ -1,0 +1,1162 @@
+{
+	"info": {
+		"_postman_id": "2e392bf7-a186-499d-90a1-f398eafef286",
+		"name": "GHU Documentation",
+		"description": "Gopher Holes Unlimited (GHU) is a fictional website to track gophers, holes, and our continuous quest to keep them from destroying our gardens.\n\nThis API is designed to help illustrate the capabilities of OAS3.0 in a fun and meaningful way.\n\n![Gopher Holes Unlimited](https://readysetcloud.s3.amazonaws.com/GHU.png)\n",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Gophers",
+			"item": [
+				{
+					"name": "Track a new gopher",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Gerry\",\n    \"picture\": \"https://gopherhunter.s3.amazonaws.com/gerry.jpg\",\n    \"location\": {\n        \"latitude\": \"consectetur dolor\",\n        \"longitude\": \"veniam\"\n    },\n    \"id\": \"8dqNfMQaR4VfHxsizLJyCx\",\n    \"type\": \"Western Pocket\",\n    \"sex\": \"male\",\n    \"timesSeen\": 42,\n    \"status\": \"at large\",\n    \"color\": \"brown\",\n    \"comment\": \"He keeps eating the carrots from my garden. So annoying!!\",\n    \"knownAssociates\": [\n        {\n            \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n            \"name\": \"Carla\"\n        },\n        {\n            \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n            \"name\": \"Carla\"\n        }\n    ]\n}",
+							"options": {
+								"raw": {}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/gophers",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"gophers"
+							]
+						},
+						"description": "When you find a new gopher, add it to the list with this endpoint. Keeping track of gophers helps the community know where they are and where not to plant their garden."
+					},
+					"response": [
+						{
+							"name": "Successfully added into the system",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Gerry\",\n    \"picture\": \"https://gopherhunter.s3.amazonaws.com/gerry.jpg\",\n    \"location\": {\n        \"latitude\": \"ea Ut qui consequat\",\n        \"longitude\": \"tempo\"\n    },\n    \"id\": \"8dqNfMQaR4VfHxsizLJyCx\",\n    \"type\": \"Western Pocket\",\n    \"sex\": \"male\",\n    \"timesSeen\": 42,\n    \"status\": \"at large\",\n    \"color\": \"brown\",\n    \"comment\": \"He keeps eating the carrots from my garden. So annoying!!\",\n    \"knownAssociates\": [\n        {\n            \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n            \"name\": \"Carla\"\n        },\n        {\n            \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n            \"name\": \"Carla\"\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/gophers",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"gophers"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"id\": \"igdLLki4no9ey1aN2rAB3s\"\n}"
+						},
+						{
+							"name": "An unexpected error occurred on the server.",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Gerry\",\n    \"picture\": \"https://gopherhunter.s3.amazonaws.com/gerry.jpg\",\n    \"location\": {\n        \"latitude\": \"ea Ut qui consequat\",\n        \"longitude\": \"tempo\"\n    },\n    \"id\": \"8dqNfMQaR4VfHxsizLJyCx\",\n    \"type\": \"Western Pocket\",\n    \"sex\": \"male\",\n    \"timesSeen\": 42,\n    \"status\": \"at large\",\n    \"color\": \"brown\",\n    \"comment\": \"He keeps eating the carrots from my garden. So annoying!!\",\n    \"knownAssociates\": [\n        {\n            \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n            \"name\": \"Carla\"\n        },\n        {\n            \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n            \"name\": \"Carla\"\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/gophers",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"gophers"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"message\": \"An unexpected error occurred.\"\n}"
+						},
+						{
+							"name": "Unable to process request. Likely due to improperly formatted request.",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Gerry\",\n    \"picture\": \"https://gopherhunter.s3.amazonaws.com/gerry.jpg\",\n    \"location\": {\n        \"latitude\": \"ea Ut qui consequat\",\n        \"longitude\": \"tempo\"\n    },\n    \"id\": \"8dqNfMQaR4VfHxsizLJyCx\",\n    \"type\": \"Western Pocket\",\n    \"sex\": \"male\",\n    \"timesSeen\": 42,\n    \"status\": \"at large\",\n    \"color\": \"brown\",\n    \"comment\": \"He keeps eating the carrots from my garden. So annoying!!\",\n    \"knownAssociates\": [\n        {\n            \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n            \"name\": \"Carla\"\n        },\n        {\n            \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n            \"name\": \"Carla\"\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/gophers",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"gophers"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"message\": \"The 'name' field is required and is missing.\"\n}"
+						}
+					]
+				},
+				{
+					"name": "View a list of all gophers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/gophers",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"gophers"
+							]
+						},
+						"description": "Use this endpoint to view a list of all gophers in the system"
+					},
+					"response": [
+						{
+							"name": "An unexpected error occurred on the server.",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/gophers",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"gophers"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"message\": \"An unexpected error occurred.\"\n}"
+						},
+						{
+							"name": "The request was successful and a list of gophers was returned",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/gophers",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"gophers"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "[\n {\n  \"id\": \"8dqNfMQaR4VfHxsizLJyCx\",\n  \"name\": \"Gerry\",\n  \"type\": \"Western Pocket\",\n  \"location\": {\n   \"latitude\": \"in consequat exercitation laborum\",\n   \"longitude\": \"voluptate anim\"\n  }\n },\n {\n  \"id\": \"8dqNfMQaR4VfHxsizLJyCx\",\n  \"name\": \"Gerry\",\n  \"type\": \"Western Pocket\",\n  \"location\": {\n   \"latitude\": \"incididunt\",\n   \"longitude\": \"ea minim ad anim\"\n  }\n }\n]"
+						}
+					]
+				},
+				{
+					"name": "Update the details of a specific gopher",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Gerry\",\n    \"picture\": \"https://gopherhunter.s3.amazonaws.com/gerry.jpg\",\n    \"location\": {\n        \"latitude\": \"ea Ut qui consequat\",\n        \"longitude\": \"tempo\"\n    },\n    \"id\": \"8dqNfMQaR4VfHxsizLJyCx\",\n    \"type\": \"Western Pocket\",\n    \"sex\": \"male\",\n    \"timesSeen\": 42,\n    \"status\": \"at large\",\n    \"color\": \"brown\",\n    \"comment\": \"He keeps eating the carrots from my garden. So annoying!!\",\n    \"knownAssociates\": [\n        {\n            \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n            \"name\": \"Carla\"\n        },\n        {\n            \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n            \"name\": \"Carla\"\n        }\n    ]\n}",
+							"options": {
+								"raw": {}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/gophers/:id",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"gophers",
+								":id"
+							],
+							"variable": [
+								{
+									"id": "81a27c64-dda5-4bab-ae04-37261cdb7df5",
+									"key": "id",
+									"value": "<string>",
+									"type": "string",
+									"description": "(Required) Unique identifier for an entity"
+								}
+							]
+						},
+						"description": "If updates are necessary to the gopher, pass in the entire gopher object and replace the entity entirely"
+					},
+					"response": [
+						{
+							"name": "An unexpected error occurred on the server.",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Gerry\",\n    \"picture\": \"https://gopherhunter.s3.amazonaws.com/gerry.jpg\",\n    \"location\": {\n        \"latitude\": \"ea Ut qui consequat\",\n        \"longitude\": \"tempo\"\n    },\n    \"id\": \"8dqNfMQaR4VfHxsizLJyCx\",\n    \"type\": \"Western Pocket\",\n    \"sex\": \"male\",\n    \"timesSeen\": 42,\n    \"status\": \"at large\",\n    \"color\": \"brown\",\n    \"comment\": \"He keeps eating the carrots from my garden. So annoying!!\",\n    \"knownAssociates\": [\n        {\n            \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n            \"name\": \"Carla\"\n        },\n        {\n            \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n            \"name\": \"Carla\"\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/gophers/:id",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"gophers",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id"
+										}
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"message\": \"An unexpected error occurred.\"\n}"
+						},
+						{
+							"name": "Unable to process request. Likely due to improperly formatted request.",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Gerry\",\n    \"picture\": \"https://gopherhunter.s3.amazonaws.com/gerry.jpg\",\n    \"location\": {\n        \"latitude\": \"ea Ut qui consequat\",\n        \"longitude\": \"tempo\"\n    },\n    \"id\": \"8dqNfMQaR4VfHxsizLJyCx\",\n    \"type\": \"Western Pocket\",\n    \"sex\": \"male\",\n    \"timesSeen\": 42,\n    \"status\": \"at large\",\n    \"color\": \"brown\",\n    \"comment\": \"He keeps eating the carrots from my garden. So annoying!!\",\n    \"knownAssociates\": [\n        {\n            \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n            \"name\": \"Carla\"\n        },\n        {\n            \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n            \"name\": \"Carla\"\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/gophers/:id",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"gophers",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id"
+										}
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"message\": \"The 'name' field is required and is missing.\"\n}"
+						},
+						{
+							"name": "A blank response is returned indicating success",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Gerry\",\n    \"picture\": \"https://gopherhunter.s3.amazonaws.com/gerry.jpg\",\n    \"location\": {\n        \"latitude\": \"ea Ut qui consequat\",\n        \"longitude\": \"tempo\"\n    },\n    \"id\": \"8dqNfMQaR4VfHxsizLJyCx\",\n    \"type\": \"Western Pocket\",\n    \"sex\": \"male\",\n    \"timesSeen\": 42,\n    \"status\": \"at large\",\n    \"color\": \"brown\",\n    \"comment\": \"He keeps eating the carrots from my garden. So annoying!!\",\n    \"knownAssociates\": [\n        {\n            \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n            \"name\": \"Carla\"\n        },\n        {\n            \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n            \"name\": \"Carla\"\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/gophers/:id",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"gophers",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id"
+										}
+									]
+								}
+							},
+							"status": "No Content",
+							"code": 204,
+							"_postman_previewlanguage": "text",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "text/plain"
+								}
+							],
+							"cookie": [],
+							"body": ""
+						}
+					]
+				},
+				{
+					"name": "Get the details of a specific gopher",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/gophers/:id",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"gophers",
+								":id"
+							],
+							"variable": [
+								{
+									"id": "32299151-238b-4b4a-8eda-1f9f40008119",
+									"key": "id",
+									"value": "<string>",
+									"type": "string",
+									"description": "(Required) Unique identifier for an entity"
+								}
+							]
+						},
+						"description": "To view additional details about a gopher, look them up by their id"
+					},
+					"response": [
+						{
+							"name": "The requested gopher has been found and the details returned",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/gophers/:id",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"gophers",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"name\": \"Gerry\",\n \"picture\": \"https://gopherhunter.s3.amazonaws.com/gerry.jpg\",\n \"location\": {\n  \"latitude\": \"ea Ut qui consequat\",\n  \"longitude\": \"tempo\"\n },\n \"id\": \"8dqNfMQaR4VfHxsizLJyCx\",\n \"type\": \"Western Pocket\",\n \"sex\": \"male\",\n \"timesSeen\": 42,\n \"status\": \"at large\",\n \"color\": \"brown\",\n \"comment\": \"He keeps eating the carrots from my garden. So annoying!!\",\n \"knownAssociates\": [\n  {\n   \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n   \"name\": \"Carla\"\n  },\n  {\n   \"id\": \"5Fe3ZQqqEcurytZdK69iew\",\n   \"name\": \"Carla\"\n  }\n ]\n}"
+						},
+						{
+							"name": "Unable to find entity with a given identifier",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/gophers/:id",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"gophers",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id"
+										}
+									]
+								}
+							},
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"message\": \"Unable to find entity with the provided id\"\n}"
+						},
+						{
+							"name": "An unexpected error occurred on the server.",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/gophers/:id",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"gophers",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id"
+										}
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"message\": \"An unexpected error occurred.\"\n}"
+						}
+					]
+				}
+			],
+			"description": "The little varmints themselves",
+			"protocolProfileBehavior": {}
+		},
+		{
+			"name": "Holes",
+			"item": [
+				{
+					"name": "Track a new hole",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"location\": {\n        \"latitude\": \"eiusmod et\",\n        \"longitude\": \"sit ullamco eu labore officia\"\n    },\n    \"id\": \"koktdBhckCtYTsHbvnXrqr\",\n    \"gopherId\": \"8dqNfMQaR4VfHxsizLJyCx\",\n    \"status\": \"visible\"\n}",
+							"options": {
+								"raw": {}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/holes",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"holes"
+							]
+						},
+						"description": "When you find a new gopher hole, add it into the system via this endpoint"
+					},
+					"response": [
+						{
+							"name": "An unexpected error occurred on the server.",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"location\": {\n        \"latitude\": \"eiusmod et\",\n        \"longitude\": \"sit ullamco eu labore officia\"\n    },\n    \"id\": \"koktdBhckCtYTsHbvnXrqr\",\n    \"gopherId\": \"8dqNfMQaR4VfHxsizLJyCx\",\n    \"status\": \"visible\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/holes",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"holes"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"message\": \"An unexpected error occurred.\"\n}"
+						},
+						{
+							"name": "Unable to process request. Likely due to improperly formatted request.",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"location\": {\n        \"latitude\": \"eiusmod et\",\n        \"longitude\": \"sit ullamco eu labore officia\"\n    },\n    \"id\": \"koktdBhckCtYTsHbvnXrqr\",\n    \"gopherId\": \"8dqNfMQaR4VfHxsizLJyCx\",\n    \"status\": \"visible\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/holes",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"holes"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"message\": \"The 'name' field is required and is missing.\"\n}"
+						},
+						{
+							"name": "Successfully added into the system",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"location\": {\n        \"latitude\": \"eiusmod et\",\n        \"longitude\": \"sit ullamco eu labore officia\"\n    },\n    \"id\": \"koktdBhckCtYTsHbvnXrqr\",\n    \"gopherId\": \"8dqNfMQaR4VfHxsizLJyCx\",\n    \"status\": \"visible\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/holes",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"holes"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"id\": \"igdLLki4no9ey1aN2rAB3s\"\n}"
+						}
+					]
+				},
+				{
+					"name": "View a list of all holes",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/holes?status=ad proident elit",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"holes"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "ad proident elit",
+									"description": "Filter holes by their current status"
+								}
+							]
+						},
+						"description": "To view a list of all the gopher holes, use this endpoint. Returns all holes by default, but has an optional query parameter to filter by status"
+					},
+					"response": [
+						{
+							"name": "An unexpected error occurred on the server.",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/holes?status=<string>",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"holes"
+									],
+									"query": [
+										{
+											"key": "status",
+											"value": "<string>"
+										}
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"message\": \"An unexpected error occurred.\"\n}"
+						},
+						{
+							"name": "The list of holes was returned",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/holes?status=<string>",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"holes"
+									],
+									"query": [
+										{
+											"key": "status",
+											"value": "<string>"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "[\n {\n  \"id\": \"koktdBhckCtYTsHbvnXrqr\",\n  \"location\": {\n   \"latitude\": \"culpa velit labore dolor\",\n   \"longitude\": \"culpa occaecat\"\n  }\n },\n {\n  \"id\": \"koktdBhckCtYTsHbvnXrqr\",\n  \"location\": {\n   \"latitude\": \"dolore sit\",\n   \"longitude\": \"Duis incididunt laborum dolor adipisicing\"\n  }\n }\n]"
+						}
+					]
+				},
+				{
+					"name": "Update the details of a specific hole",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"location\": {\n        \"latitude\": \"eiusmod et\",\n        \"longitude\": \"sit ullamco eu labore officia\"\n    },\n    \"id\": \"koktdBhckCtYTsHbvnXrqr\",\n    \"gopherId\": \"8dqNfMQaR4VfHxsizLJyCx\",\n    \"status\": \"visible\"\n}",
+							"options": {
+								"raw": {}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/holes/:id",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"holes",
+								":id"
+							],
+							"variable": [
+								{
+									"id": "08360c07-4f53-4368-a7e7-9f4768ee8c81",
+									"key": "id",
+									"value": "ad proident elit",
+									"type": "string",
+									"description": "(Required) Unique identifier for an entity"
+								}
+							]
+						},
+						"description": "If updates are necessary to the hole, pass in all the details and replace the entity entirely."
+					},
+					"response": [
+						{
+							"name": "A blank response is returned indicating success",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"location\": {\n        \"latitude\": \"eiusmod et\",\n        \"longitude\": \"sit ullamco eu labore officia\"\n    },\n    \"id\": \"koktdBhckCtYTsHbvnXrqr\",\n    \"gopherId\": \"8dqNfMQaR4VfHxsizLJyCx\",\n    \"status\": \"visible\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/holes/:id",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"holes",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id"
+										}
+									]
+								}
+							},
+							"status": "No Content",
+							"code": 204,
+							"_postman_previewlanguage": "text",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "text/plain"
+								}
+							],
+							"cookie": [],
+							"body": ""
+						},
+						{
+							"name": "An unexpected error occurred on the server.",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"location\": {\n        \"latitude\": \"eiusmod et\",\n        \"longitude\": \"sit ullamco eu labore officia\"\n    },\n    \"id\": \"koktdBhckCtYTsHbvnXrqr\",\n    \"gopherId\": \"8dqNfMQaR4VfHxsizLJyCx\",\n    \"status\": \"visible\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/holes/:id",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"holes",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id"
+										}
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"message\": \"An unexpected error occurred.\"\n}"
+						},
+						{
+							"name": "Unable to process request. Likely due to improperly formatted request.",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"location\": {\n        \"latitude\": \"eiusmod et\",\n        \"longitude\": \"sit ullamco eu labore officia\"\n    },\n    \"id\": \"koktdBhckCtYTsHbvnXrqr\",\n    \"gopherId\": \"8dqNfMQaR4VfHxsizLJyCx\",\n    \"status\": \"visible\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/holes/:id",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"holes",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id"
+										}
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"message\": \"The 'name' field is required and is missing.\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get the details of a specific hole",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/holes/:id",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"holes",
+								":id"
+							],
+							"variable": [
+								{
+									"id": "59f7ec1d-4cdc-4bdb-a5f3-b6664d76f6b4",
+									"key": "id",
+									"value": "<string>",
+									"type": "string",
+									"description": "(Required) Unique identifier for an entity"
+								}
+							]
+						},
+						"description": "To view additional details about a hole, look it up by id."
+					},
+					"response": [
+						{
+							"name": "An unexpected error occurred on the server.",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/holes/:id",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"holes",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id"
+										}
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"message\": \"An unexpected error occurred.\"\n}"
+						},
+						{
+							"name": "The requested hole has been found and the details returned",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/holes/:id",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"holes",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"location\": {\n  \"latitude\": \"eiusmod et\",\n  \"longitude\": \"sit ullamco eu labore officia\"\n },\n \"id\": \"koktdBhckCtYTsHbvnXrqr\",\n \"gopherId\": \"8dqNfMQaR4VfHxsizLJyCx\",\n \"status\": \"visible\"\n}"
+						},
+						{
+							"name": "Unable to find entity with a given identifier",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/holes/:id",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"holes",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id"
+										}
+									]
+								}
+							},
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"message\": \"Unable to find entity with the provided id\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Update the gopher hole status",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"filled\"\n}",
+							"options": {
+								"raw": {}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/holes/:id/statuses",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"holes",
+								":id",
+								"statuses"
+							],
+							"variable": [
+								{
+									"id": "363b3f7c-208c-43da-8ac3-af0b733706ca",
+									"key": "id",
+									"value": "<string>",
+									"type": "string",
+									"description": "(Required) Unique identifier for an entity"
+								}
+							]
+						},
+						"description": "When the status of the gopher hole changes, i.e. filled, post to the this endpoint to update the hole."
+					},
+					"response": [
+						{
+							"name": "Unable to process request. Likely due to improperly formatted request.",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"status\": \"filled\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/holes/:id/statuses",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"holes",
+										":id",
+										"statuses"
+									],
+									"variable": [
+										{
+											"key": "id"
+										}
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"message\": \"The 'name' field is required and is missing.\"\n}"
+						},
+						{
+							"name": "An unexpected error occurred on the server.",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"status\": \"filled\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/holes/:id/statuses",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"holes",
+										":id",
+										"statuses"
+									],
+									"variable": [
+										{
+											"key": "id"
+										}
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n \"message\": \"An unexpected error occurred.\"\n}"
+						},
+						{
+							"name": "A blank response is returned indicating success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"status\": \"filled\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/holes/:id/statuses",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"holes",
+										":id",
+										"statuses"
+									],
+									"variable": [
+										{
+											"key": "id"
+										}
+									]
+								}
+							},
+							"status": "No Content",
+							"code": 204,
+							"_postman_previewlanguage": "text",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "text/plain"
+								}
+							],
+							"cookie": [],
+							"body": ""
+						}
+					]
+				}
+			],
+			"description": "Details on the gopher holes",
+			"protocolProfileBehavior": {}
+		}
+	],
+	"variable": [
+		{
+			"id": "baseUrl",
+			"key": "baseUrl",
+			"value": "/",
+			"type": "string"
+		}
+	],
+	"protocolProfileBehavior": {}
+}
