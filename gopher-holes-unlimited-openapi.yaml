@@ -14,18 +14,18 @@ tags:
   - name: Holes
     description: Details on the gopher holes
 
+servers:
+  - description: test
+    url: https://c5dbc886-b8ab-48c8-907b-d34893b05569.mock.pstmn.io
+    
 paths:
   /gophers:
     post:
       summary: Track a new gopher
-      description: |
-        ### Finding a new Gopher
-
-        When you find a new gopher, add it to the list with this endpoint. Keeping track of gophers
-        helps the community know where they are and where not to plant their garden.
-      tags:
+      description: When you find a new gopher, add it to the list with this endpoint. Keeping track of gophers helps the community know where they are and where not to plant their garden.
+      tags: 
         - Gophers
-      requestBody:
+      requestBody: 
         required: true
         content:
           application/json:
@@ -54,7 +54,7 @@ paths:
                   $ref: '#/components/schemas/GopherSummary'
         500:
           $ref: '#/components/responses/UnknownError'
-
+          
   /gophers/{id}:
     parameters:
       - $ref: '#/components/parameters/id'
@@ -92,7 +92,15 @@ paths:
           $ref: '#/components/responses/NotFound'
         500:
           $ref: '#/components/responses/UnknownError'
-
+    delete:
+        summary: delete a gopher
+        description: Deletes a gopher and all statuses from the system
+        tags:
+            - Gopher
+        responses:
+            204:
+                $ref: '#/components/responses/NoContent'
+    
   /holes:
     post:
       summary: Track a new hole
@@ -121,9 +129,9 @@ paths:
           required: false
           description: Filter holes by their current status
           example: filled
-          schema:
+          schema: 
             type: string
-      tags:
+      tags: 
         - Holes
       responses:
         200:
@@ -136,7 +144,7 @@ paths:
                   $ref: '#/components/schemas/HoleSummary'
         500:
           $ref: '#/components/responses/UnknownError'
-
+          
   /holes/{id}:
     parameters:
       - $ref: '#/components/parameters/id'
@@ -174,12 +182,12 @@ paths:
           $ref: '#/components/responses/NotFound'
         500:
           $ref: '#/components/responses/UnknownError'
-
+          
   /holes/{id}/statuses:
     parameters:
       - $ref: '#/components/parameters/id'
     post:
-      summary: Update the gopher hole status
+      summary: Update the gopher hole status 
       description: When the status of the gopher hole changes, i.e. filled, post to the this endpoint to update the hole.
       tags:
         - Holes
@@ -204,7 +212,7 @@ paths:
           $ref: '#/components/responses/BadRequest'
         500:
           $ref: '#/components/responses/UnknownError'
-
+  
 
 components:
   parameters:
@@ -212,10 +220,10 @@ components:
       name: id
       in: path
       description: Unique identifier for an entity
-      required: true
-      example: dhr558QRdvSoBkM9JcLFSK
+      required: true      
       schema:
         type: string
+        example: dhr558QRdvSoBkM9JcLFSK
   schemas:
     Gopher:
       description: All information describing a gopher
@@ -261,8 +269,6 @@ components:
           description: Fur color
           example: brown
         location:
-          type: object
-          description: Known location of the gopher
           oneOf:
             - type: object
               required:
@@ -278,7 +284,7 @@ components:
                   description: Longitude location of the gopher's whereabouts
                   example: -96.801599
             - type: object
-              required:
+              required: 
                 - city
                 - state
               properties:
@@ -303,7 +309,7 @@ components:
             longitude: -96.801599
         comment:
           type: string
-          description: Text comment with any additional details
+          description: Text comment with any additional details 
           example: He keeps eating the carrots from my garden. So annoying!!
         knownAssociates:
           type: array
@@ -319,7 +325,7 @@ components:
                 example: 5Fe3ZQqqEcurytZdK69iew
               name:
                 type: string
-                description: Name of the associated gopher
+                description: Name of the associated gopher 
                 example: Carla
     GopherSummary:
       description: High level information about a gopher
@@ -359,7 +365,7 @@ components:
                   description: Longitude location of the gopher's whereabouts
                   example: -96.801599
             - type: object
-              required:
+              required: 
                 - city
                 - state
               properties:
@@ -382,7 +388,7 @@ components:
           example:
             latitude: 33.067067
             longitude: -96.801599
-
+            
     Hole:
       description: Full detailed information about a gopher hole
       type: object
@@ -417,6 +423,10 @@ components:
           enum: [filled, visible]
           description: Current status of the hole
           example: visible
+        comment:
+            type: string
+            description: The hole comment
+            example: This one is huge! I stepped right in it!
     HoleSummary:
       description: High level information about a gopher hole
       type: object
@@ -450,7 +460,7 @@ components:
         application/json:
           schema:
             type: object
-            required:
+            required: 
               - id
             properties:
               id:
@@ -489,7 +499,7 @@ components:
         application/json:
           schema:
             type: object
-            required:
+            required: 
               - message
             properties:
               message:
@@ -498,3 +508,4 @@ components:
                 example: An unexpected error occurred.
     NoContent:
       description: A blank response is returned indicating success
+     
