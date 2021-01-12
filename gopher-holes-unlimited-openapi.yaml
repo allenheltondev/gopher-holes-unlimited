@@ -17,12 +17,17 @@ tags:
 servers:
   - description: test
     url: https://c5dbc886-b8ab-48c8-907b-d34893b05569.mock.pstmn.io
+  - description: prod
+    url: https://gopherholesunlimited.dev
     
 paths:
   /gophers:
     post:
       summary: Track a new gopher
-      description: When you find a new gopher, add it to the list with this endpoint. Keeping track of gophers helps the community know where they are and where not to plant their garden.
+      description: |-
+        When you find a new gopher, add it to the list with this 
+        endpoint. Keeping track of gophers helps the community know where they 
+        are and where not to plant their garden.
       tags: 
         - Gophers
       requestBody: 
@@ -34,6 +39,10 @@ paths:
       responses:
         201:
           $ref: '#/components/responses/Created'
+          x-postman-variables:
+            - type: save
+              name: gopherId
+              path: .id
         400:
           $ref: '#/components/responses/BadRequest'
         500:
@@ -55,9 +64,9 @@ paths:
         500:
           $ref: '#/components/responses/UnknownError'
           
-  /gophers/{id}:
+  /gophers/{gopherId}:
     parameters:
-      - $ref: '#/components/parameters/id'
+      - $ref: '#/components/parameters/gopherId'
     put:
       summary: Update the details of a specific gopher
       description: If updates are necessary to the gopher, pass in the entire gopher object and replace the entity entirely
@@ -145,9 +154,9 @@ paths:
         500:
           $ref: '#/components/responses/UnknownError'
           
-  /holes/{id}:
+  /holes/{holeId}:
     parameters:
-      - $ref: '#/components/parameters/id'
+      - $ref: '#/components/parameters/holeId'
     put:
       summary: Update the details of a specific hole
       description: If updates are necessary to the hole, pass in all the details and replace the entity entirely.
@@ -183,9 +192,9 @@ paths:
         500:
           $ref: '#/components/responses/UnknownError'
           
-  /holes/{id}/statuses:
+  /holes/{holeId}/statuses:
     parameters:
-      - $ref: '#/components/parameters/id'
+      - $ref: '#/components/parameters/holeId'
     post:
       summary: Update the gopher hole status 
       description: When the status of the gopher hole changes, i.e. filled, post to the this endpoint to update the hole.
@@ -215,15 +224,29 @@ paths:
   
 
 components:
-  parameters:
-    id:
-      name: id
+  parameters:    
+    gopherId:
+      name: gopherId
       in: path
-      description: Unique identifier for an entity
+      description: Unique identifier for a gopher
+      required: true
+      schema:
+        type: string
+        example: kfghusfdglksgu858y
+      x-postman-variables:
+        type: load
+        name: gopherId
+    holeId:
+      name: holeId
+      in: path
+      description: Unique identifier for a hole
       required: true      
       schema:
         type: string
         example: dhr558QRdvSoBkM9JcLFSK
+      x-postman-variables:
+        - type: load
+          name: holeId
   schemas:
     Gopher:
       description: All information describing a gopher
