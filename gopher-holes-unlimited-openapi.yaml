@@ -24,10 +24,7 @@ paths:
   /gophers:
     post:
       summary: Track a new gopher
-      description: |-
-        When you find a new gopher, add it to the list with this 
-        endpoint. Keeping track of gophers helps the community know where they 
-        are and where not to plant their garden.
+      description: When you find a new gopher, add it to the list with this endpoint. Keeping track of gophers helps the community know where they are and where not to plant their garden.
       tags: 
         - Gophers
       requestBody: 
@@ -43,10 +40,6 @@ paths:
             - type: save
               name: gopherId
               path: .id
-        400:
-          $ref: '#/components/responses/BadRequest'
-        500:
-          $ref: '#/components/responses/UnknownError'
     get:
       summary: View a list of all gophers
       description: Use this endpoint to view a list of all gophers in the system
@@ -61,8 +54,6 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/GopherSummary'
-        500:
-          $ref: '#/components/responses/UnknownError'
           
   /gophers/{gopherId}:
     parameters:
@@ -81,10 +72,6 @@ paths:
       responses:
         204:
           $ref: '#/components/responses/NoContent'
-        400:
-          $ref: '#/components/responses/BadRequest'
-        500:
-          $ref: '#/components/responses/UnknownError'
     get:
       summary: Get the details of a specific gopher
       description: To view additional details about a gopher, look them up by their id
@@ -96,19 +83,43 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Gopher'
-        404:
-          $ref: '#/components/responses/NotFound'
-        500:
-          $ref: '#/components/responses/UnknownError'
+                $ref: '#/components/schemas/Gopher'   
     delete:
-        summary: delete a gopher
-        description: Deletes a gopher and all statuses from the system
-        tags:
-            - Gopher
-        responses:
-            204:
-                $ref: '#/components/responses/NoContent'
+      summary: Delete a gopher
+      description: Deletes a gopher and all statuses from the system
+      tags:
+        - Gophers
+      responses:
+        204:
+          $ref: '#/components/responses/NoContent'
+
+  /gophers/{gopherId}/statuses:
+      parameters:
+          - $ref: '#/components/parameters/gopherId'
+      post:
+          summary: Add a new status to a specific gopher
+          description: Sets a the current status of a gopher. All status history is maintained
+          tags: 
+             - Gophers
+          requestBody:
+             required: true
+             content:
+                 application/json:
+                     schema:
+                        type: object
+                        required:
+                            - status
+                        properties:
+                          status:
+                            type: string
+                            description: Current status of the gopher
+                            enum: [at large, trapped, deceased, unknown]
+                            example: trapped
+          responses:
+            201: 
+                $ref: '#/components/responses/Created'
+            404: 
+                $ref: '#/components/responses/NotFound'                        
     
   /holes:
     post:
@@ -125,10 +136,10 @@ paths:
       responses:
         201:
           $ref: '#/components/responses/Created'
-        400:
-          $ref: '#/components/responses/BadRequest'
-        500:
-          $ref: '#/components/responses/UnknownError'
+          x-postman-variables:
+              - type: save
+                name: holdId
+                path: .id
     get:
       summary: View a list of all holes
       description: To view a list of all the gopher holes, use this endpoint. Returns all holes by default, but has an optional query parameter to filter by status
@@ -151,8 +162,6 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/HoleSummary'
-        500:
-          $ref: '#/components/responses/UnknownError'
           
   /holes/{holeId}:
     parameters:
@@ -171,10 +180,6 @@ paths:
       responses:
         204:
           $ref: '#/components/responses/NoContent'
-        400:
-          $ref: '#/components/responses/BadRequest'
-        500:
-          $ref: '#/components/responses/UnknownError'
     get:
       summary: Get the details of a specific hole
       description: To view additional details about a hole, look it up by id.
@@ -187,10 +192,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Hole'
-        404:
-          $ref: '#/components/responses/NotFound'
-        500:
-          $ref: '#/components/responses/UnknownError'
           
   /holes/{holeId}/statuses:
     parameters:
@@ -216,16 +217,11 @@ paths:
                   example: filled
       responses:
         204:
-          $ref: '#/components/responses/NoContent'
-        400:
-          $ref: '#/components/responses/BadRequest'
-        500:
-          $ref: '#/components/responses/UnknownError'
-  
+          $ref: '#/components/responses/NoContent'  
 
 components:
-  parameters:    
-    gopherId:
+  parameters:
+   gopherId:
       name: gopherId
       in: path
       description: Unique identifier for a gopher
@@ -236,7 +232,7 @@ components:
       x-postman-variables:
         type: load
         name: gopherId
-    holeId:
+   holeId:
       name: holeId
       in: path
       description: Unique identifier for a hole
@@ -360,7 +356,7 @@ components:
         id:
           type: string
           description: Unique identifier of the gopher
-          example: 8dqNfMQaR4VfHxsizLJyCx
+          example: igdLLki4no9ey1aN2rAB3s
         name:
           type: string
           description: The name of the gopher given by the hunter who submitted it
@@ -425,7 +421,7 @@ components:
         gopherId:
           type: string
           description: The gopher who dug the hole
-          example: 8dqNfMQaR4VfHxsizLJyCx
+          example: igdLLki4no9ey1aN2rAB3s
         location:
           type: object
           description: Known location of the gopher
@@ -445,7 +441,7 @@ components:
           type: string
           enum: [filled, visible]
           description: Current status of the hole
-          example: visible
+          example: filled
         comment:
             type: string
             description: The hole comment
