@@ -1,0 +1,14 @@
+{
+  "name": "gopher-holes-unlimited",
+  "version": "1.0.0",
+  "description": "This is an example application that uses OAS3.0 to define an API. It is an fictional business to track gophers and holes",
+  "devDependencies": {
+    "aws-sdk": "^2.543.0",
+    "eslint": "^6.8.0",
+    "eslint-config-google": "^0.14.0"
+  },
+  "scripts": {
+    "deploy": "sam build -t template.yaml --parallel && sam package --output-template-file packaged.yaml --s3-bucket gopherholesunlimited --profile home && sam deploy --template-file packaged.yaml --stack-name gopher-holes-unlimited --capabilities CAPABILITY_IAM --profile home"
+  },
+  "license": "MIT"
+}

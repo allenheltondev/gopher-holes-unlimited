@@ -18,7 +18,17 @@ servers:
   - description: test
     url: https://c5dbc886-b8ab-48c8-907b-d34893b05569.mock.pstmn.io
   - description: prod
-    url: https://gopherholesunlimited.dev
+    url: https://api.gopherholesunlimited.com
+
+x-amazon-apigateway-request-validators:
+  Validate All:
+    validateRequestParameters: true
+    validateRequestBody: true
+x-amazon-apigateway-gateway-responses:
+  BAD_REQUEST_BODY:
+    statusCode: 400
+    responseTemplates:
+      application/json: '{ "message": "$context.error.validationErrorString" }'  
     
 paths:
   /gophers:
@@ -40,6 +50,14 @@ paths:
             - type: save
               name: gopherId
               path: .id
+        400:
+          $ref: '#/components/responses/BadRequest'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AddGopherFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
     get:
       summary: View a list of all gophers
       description: Use this endpoint to view a list of all gophers in the system
@@ -51,47 +69,13 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/GopherSummary'
-          
-  /gophers/{gopherId}:
-    parameters:
-      - $ref: '#/components/parameters/gopherId'
-    put:
-      summary: Update the details of a specific gopher
-      description: If updates are necessary to the gopher, pass in the entire gopher object and replace the entity entirely
-      tags:
-        - Gophers
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Gopher'
-      responses:
-        204:
-          $ref: '#/components/responses/NoContent'
-    get:
-      summary: Get the details of a specific gopher
-      description: To view additional details about a gopher, look them up by their id
-      tags:
-        - Gophers
-      responses:
-        200:
-          description: The requested gopher has been found and the details returned
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Gopher'   
-    delete:
-      summary: Delete a gopher
-      description: Deletes a gopher and all statuses from the system
-      tags:
-        - Gophers
-      responses:
-        204:
-          $ref: '#/components/responses/NoContent'
+                $ref: '#/components/schemas/GopherSummary'                  
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetAllGophersFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
 
   /gophers/{gopherId}/statuses:
       parameters:
@@ -112,14 +96,85 @@ paths:
                         properties:
                           status:
                             type: string
+                            minLength: 1
                             description: Current status of the gopher
                             enum: [at large, trapped, deceased, unknown]
                             example: trapped
           responses:
-            201: 
-                $ref: '#/components/responses/Created'
+            204: 
+              $ref: '#/components/responses/NoContent'
+            400:
+              $ref: '#/components/responses/BadRequest'
             404: 
-                $ref: '#/components/responses/NotFound'                        
+              $ref: '#/components/responses/NotFound'
+          x-amazon-apigateway-request-validator: Validate All
+          x-amazon-apigateway-integration:
+            uri:
+              Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AddGopherStatusFunction.Arn}/invocations
+            httpMethod: POST
+            type: aws_proxy       
+
+  /gophers/{gopherId}:
+    parameters:
+      - $ref: '#/components/parameters/gopherId'
+    put:
+      summary: Update the details of a specific gopher
+      description: If updates are necessary to the gopher, pass in the entire gopher object and replace the entity entirely
+      tags:
+        - Gophers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Gopher'
+      responses:
+        204:
+          $ref: '#/components/responses/NoContent'
+        400:
+          $ref: '#/components/responses/BadRequest'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateGopherFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+    get:
+      summary: Get the details of a specific gopher
+      description: To view additional details about a gopher, look them up by their id
+      tags:
+        - Gophers
+      responses:
+        200:
+          description: The requested gopher has been found and the details returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Gopher'
+        404:
+          $ref: '#/components/responses/NotFound'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetGopherFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy   
+    delete:
+      summary: Delete a gopher
+      description: Deletes a gopher and all statuses from the system
+      tags:
+        - Gophers
+      responses:
+        204:
+          $ref: '#/components/responses/NoContent'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteGopherFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+
+                
     
   /holes:
     post:
@@ -140,6 +195,14 @@ paths:
               - type: save
                 name: holdId
                 path: .id
+        400:
+          $ref: '#/components/responses/BadRequest'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AddHoleFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
     get:
       summary: View a list of all holes
       description: To view a list of all the gopher holes, use this endpoint. Returns all holes by default, but has an optional query parameter to filter by status
@@ -159,39 +222,13 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/HoleSummary'
-          
-  /holes/{holeId}:
-    parameters:
-      - $ref: '#/components/parameters/holeId'
-    put:
-      summary: Update the details of a specific hole
-      description: If updates are necessary to the hole, pass in all the details and replace the entity entirely.
-      tags:
-        - Holes
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Hole'
-      responses:
-        204:
-          $ref: '#/components/responses/NoContent'
-    get:
-      summary: Get the details of a specific hole
-      description: To view additional details about a hole, look it up by id.
-      tags:
-        - Holes
-      responses:
-        200:
-          description: The requested hole has been found and the details returned
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Hole'
+                $ref: '#/components/schemas/HoleSummary'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetAllHolesFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
           
   /holes/{holeId}/statuses:
     parameters:
@@ -212,12 +249,69 @@ paths:
               properties:
                 status:
                   type: string
+                  minLength: 1
                   enum: [filled, visible]
                   description: New status of the gopher hole
                   example: filled
       responses:
         204:
-          $ref: '#/components/responses/NoContent'  
+          $ref: '#/components/responses/NoContent'
+        400:
+          $ref: '#/components/responses/BadRequest' 
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AddHoleStatusFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy 
+
+  /holes/{holeId}:
+    parameters:
+      - $ref: '#/components/parameters/holeId'
+    put:
+      summary: Update the details of a specific hole
+      description: If updates are necessary to the hole, pass in all the details and replace the entity entirely.
+      tags:
+        - Holes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Hole'
+      responses:
+        204:
+          $ref: '#/components/responses/NoContent'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        404:
+          $ref: '#/components/responses/NotFound'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateHoleFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+    get:
+      summary: Get the details of a specific hole
+      description: To view additional details about a hole, look it up by id.
+      tags:
+        - Holes
+      responses:
+        200:
+          description: The requested hole has been found and the details returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hole'
+        404:
+          $ref: '#/components/responses/NotFound'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetHoleFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
 
 components:
   parameters:
@@ -230,8 +324,8 @@ components:
         type: string
         example: kfghusfdglksgu858y
       x-postman-variables:
-        type: load
-        name: gopherId
+        - type: load
+          name: gopherId
    holeId:
       name: holeId
       in: path
@@ -258,6 +352,7 @@ components:
           example: 8dqNfMQaR4VfHxsizLJyCx
         name:
           type: string
+          minLength: 1
           description: The name of the gopher given by the hunter who submitted it
           example: Gerry
         type:
@@ -272,6 +367,7 @@ components:
           example: male
         picture:
           type: string
+          minLength: 1
           description: Url of a recent photo
           example: https://gopherhunter.s3.amazonaws.com/gerry.jpg
         timesSeen:
@@ -285,7 +381,7 @@ components:
           example: at large
         color:
           type: string
-          description: Fur color
+          description: Color of the Gopher's fur
           example: brown
         location:
           oneOf:
@@ -296,12 +392,14 @@ components:
               properties:
                 latitude:
                   type: string
+                  minLength: 1
                   description: Latitude location of the gopher's whereabouts
-                  example: 33.067067
+                  example: "33.067067"
                 longitude:
                   type: string
+                  minLength: 1
                   description: Longitude location of the gopher's whereabouts
-                  example: -96.801599
+                  example: "-96.801599"
             - type: object
               required: 
                 - city
@@ -317,15 +415,17 @@ components:
                   example: 'Apt #2212'
                 city:
                   type: string
+                  minLength: 1
                   description: City of the known whereabouts
                   example: Plano
                 state:
                   type: string
+                  minLength: 1
                   description: State of the known whereabouts
                   example: TX
           example:
-            latitude: 33.067067
-            longitude: -96.801599
+            latitude: "33.067067"
+            longitude: "-96.801599"
         comment:
           type: string
           description: Text comment with any additional details 
@@ -340,73 +440,83 @@ components:
             properties:
               id:
                 type: string
+                minLength: 1
                 description: Unique identifier of the gopher
                 example: 5Fe3ZQqqEcurytZdK69iew
               name:
                 type: string
+                minLength: 1
                 description: Name of the associated gopher 
                 example: Carla
     GopherSummary:
       description: High level information about a gopher
-      type: object
-      required:
-        - id
-        - name
-      properties:
-        id:
-          type: string
-          description: Unique identifier of the gopher
-          example: igdLLki4no9ey1aN2rAB3s
-        name:
-          type: string
-          description: The name of the gopher given by the hunter who submitted it
-          example: Gerry
-        type:
-          type: string
-          enum: [Western Pocket, Eastern Pocket, Geomys]
-          description: What kind of gopher is this?
-          example: Western Pocket
-        location:
-          type: object
-          description: Known location of the gopher
-          oneOf:
-            - type: object
-              required:
-                - latitude
-                - longitude
-              properties:
-                latitude:
-                  type: string
-                  description: Latitude location of the gopher's whereabouts
-                  example: 33.067067
-                longitude:
-                  type: string
-                  description: Longitude location of the gopher's whereabouts
-                  example: -96.801599
-            - type: object
-              required: 
-                - city
-                - state
-              properties:
-                addressLine1:
-                  type: string
-                  description: Line 1 of the address of the known whereabouts
-                  example: 123 Main Street
-                addressLine 2:
-                  type: string
-                  description: Line 2 of the address of the known whereabouts
-                  example: 'Apt #2212'
-                city:
-                  type: string
-                  description: City of the known whereabouts
-                  example: Plano
-                state:
-                  type: string
-                  description: State of the known whereabouts
-                  example: TX
-          example:
-            latitude: 33.067067
-            longitude: -96.801599
+      type: array
+      items:
+        type: object
+        required:
+          - id
+          - name
+        properties:
+          id:
+            type: string
+            minLength: 1
+            description: Unique identifier of the gopher
+            example: igdLLki4no9ey1aN2rAB3s
+          name:
+            type: string
+            minLength: 1
+            description: The name of the gopher given by the hunter who submitted it
+            example: Gerry
+          type:
+            type: string
+            enum: [Western Pocket, Eastern Pocket, Geomys]
+            description: What kind of gopher is this?
+            example: Western Pocket
+          location:
+            type: object
+            description: Known location of the gopher
+            oneOf:
+              - type: object
+                required:
+                  - latitude
+                  - longitude
+                properties:
+                  latitude:
+                    type: string
+                    minLength: 1
+                    description: Latitude location of the gopher's whereabouts
+                    example: "33.067067"
+                  longitude:
+                    type: string
+                    minLength: 1
+                    description: Longitude location of the gopher's whereabouts
+                    example: "-96.801599"
+              - type: object
+                required: 
+                  - city
+                  - state
+                properties:
+                  addressLine1:
+                    type: string
+                    description: Line 1 of the address of the known whereabouts
+                    example: 123 Main Street
+                  addressLine 2:
+                    type: string
+                    description: Line 2 of the address of the known whereabouts
+                    example: 'Apt #2212'
+                  city:
+                    type: string
+                    minLength: 1
+                    description: City of the known whereabouts
+                    example: Plano
+                  state:
+                    type: string
+                    minLength: 1
+                    description: State of the known whereabouts
+                    example: TX
+            example:
+              latitude: "33.067067"
+              longitude: "-96.801599"
             
     Hole:
       description: Full detailed information about a gopher hole
@@ -431,12 +541,14 @@ components:
           properties:
             latitude:
               type: string
+              minLength: 1
               description: Latitude location of the hole
-              example: 33.067067
+              example: "33.067067"
             longitude:
               type: string
+              minLength: 1
               description: Longitude location of the hole
-              example: -96.801599
+              example: "-96.801599"
         status:
           type: string
           enum: [filled, visible]
@@ -448,30 +560,35 @@ components:
             example: This one is huge! I stepped right in it!
     HoleSummary:
       description: High level information about a gopher hole
-      type: object
-      required:
-        - id
-        - location
-      properties:
-        id:
-          type: string
-          description: Unique identifier for the hole
-          example: koktdBhckCtYTsHbvnXrqr
-        location:
-          type: object
-          description: Known location of the gopher
-          required:
-            - latitude
-            - longitude
-          properties:
-            latitude:
-              type: string
-              description: Latitude location of the hole
-              example: 33.067067
-            longitude:
-              type: string
-              description: Longitude location of the hole
-              example: -96.801599
+      type: array
+      items:
+        type: object
+        required:
+          - id
+          - location
+        properties:
+          id:
+            type: string
+            minLength: 1
+            description: Unique identifier for the hole
+            example: koktdBhckCtYTsHbvnXrqr
+          location:
+            type: object
+            description: Known location of the gopher
+            required:
+              - latitude
+              - longitude
+            properties:
+              latitude:
+                type: string
+                minLength: 1
+                description: Latitude location of the hole
+                example: "33.067067"
+              longitude:
+                type: string
+                minLength: 1
+                description: Longitude location of the hole
+                example: "-96.801599"
   responses:
     Created:
       description: Successfully added into the system

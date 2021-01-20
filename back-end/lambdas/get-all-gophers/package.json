@@ -1,0 +1,15 @@
+{
+  "name": "get-all-gophers",
+  "version": "1.0.0",
+  "description": "Get a summary of all the gophers in the system",
+  "main": "app.js",
+  "author": "allenheltondev",
+  "license": "MIT",
+  "dependencies": {
+    "http-status-codes": "^1.4.0"
+  },
+  "scripts": {},
+  "devDependencies": {
+    "aws-sdk": "^2.543.0"
+  }
+}

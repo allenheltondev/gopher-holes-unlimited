@@ -1,0 +1,15 @@
+{
+  "name": "delete-gopher",
+  "version": "1.0.0",
+  "description": "Delete a gopher from the system",
+  "main": "app.js",
+  "author": "allenheltondev",
+  "license": "MIT",
+  "dependencies": {
+    "http-status-codes": "^1.4.0"
+  },
+  "scripts": {},
+  "devDependencies": {
+    "aws-sdk": "^2.543.0"
+  }
+}

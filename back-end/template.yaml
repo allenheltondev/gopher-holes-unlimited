@@ -1,0 +1,500 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Gopher Holes Unlimited
+  SAM Template describing the way to implement a basic serverless service using a REST API and OAS
+Parameters:
+  TableName:
+    Type: String
+    Default: gopherholes
+
+Globals:
+  Function:
+    Runtime: nodejs12.x
+    Tracing: Active
+    Timeout: 3
+  Api:
+    Cors:
+      AllowMethods: "'DELETE,GET,POST,PUT'"
+      AllowHeaders: "'Content-Type'"
+      AllowOrigin: "'*'"
+
+Resources:
+  GopherHolesApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      TracingEnabled: false
+      StageName: dev
+      DefinitionBody:
+        Fn::Transform:
+          Name: AWS::Include
+          Parameters:
+            Location: ../gopher-holes-unlimited-openapi.yaml
+
+  AddGopherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/add-gopher/
+      Handler: add-gopher.lambdaHandler
+      Role: !GetAtt AddGopherRole.Arn
+      Environment:
+        Variables:
+          TableName: !Ref TableName
+      Events:
+        AddGopherEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GopherHolesApi
+            Path: /gophers
+            Method: POST
+
+  AddGopherRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: addgopherpolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: !GetAtt GopherHolesTable.Arn              
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+
+  AddGopherStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/add-gopher-status/
+      Handler: add-gopher-status.lambdaHandler
+      Role: !GetAtt AddGopherStatusRole.Arn
+      Environment:
+        Variables:
+          TableName: !Ref TableName
+      Events:
+        AddGopherStatusEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GopherHolesApi
+            Path: /gophers/{gopherId}/statuses
+            Method: POST
+
+  AddGopherStatusRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: addgopherstatuspolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt GopherHolesTable.Arn              
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+
+  GetAllGophersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/get-all-gophers/
+      Handler: get-all-gophers.lambdaHandler
+      Role: !GetAtt GetAllGophersRole.Arn
+      Environment:
+        Variables:
+          TableName: !Ref TableName
+      Events:
+        GetAllGophersEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GopherHolesApi
+            Path: /gophers
+            Method: GET
+
+  GetAllGophersRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: getallgopherspolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                Resource: !GetAtt GopherHolesTable.Arn              
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+
+  GetGopherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/get-gopher/
+      Handler: get-gopher.lambdaHandler
+      Role: !GetAtt GetGopherRole.Arn
+      Environment:
+        Variables:
+          TableName: !Ref TableName
+      Events:
+        GetGopherEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GopherHolesApi
+            Path: /gophers/{gopherId}
+            Method: GET
+
+  GetGopherRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: getgopherpolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                Resource: !GetAtt GopherHolesTable.Arn              
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+
+  UpdateGopherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/update-gopher/
+      Handler: update-gopher.lambdaHandler
+      Role: !GetAtt UpdateGopherRole.Arn
+      Environment:
+        Variables:
+          TableName: !Ref TableName
+      Events:
+        UpdateGopherEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GopherHolesApi
+            Path: /gophers/{gopherId}
+            Method: PUT
+
+  UpdateGopherRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: updategopherpolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: !GetAtt GopherHolesTable.Arn              
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+
+  DeleteGopherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/delete-gopher/
+      Handler: delete-gopher.lambdaHandler
+      Role: !GetAtt DeleteGopherRole.Arn
+      Environment:
+        Variables:
+          TableName: !Ref TableName
+      Events:
+        DeleteGopherEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GopherHolesApi
+            Path: /gophers/{gopherId}
+            Method: DELETE
+
+  DeleteGopherRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: deletegopherpolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt GopherHolesTable.Arn              
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+
+  AddHoleFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/add-hole/
+      Handler: add-hole.lambdaHandler
+      Role: !GetAtt AddHoleRole.Arn
+      Environment:
+        Variables:
+          TableName: !Ref TableName
+      Events:
+        AddHoleEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GopherHolesApi
+            Path: /holes
+            Method: POST
+
+  AddHoleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: addholepolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: !GetAtt GopherHolesTable.Arn              
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+
+  AddHoleStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/add-hole-status/
+      Handler: add-hole-status.lambdaHandler
+      Role: !GetAtt AddHoleStatusRole.Arn
+      Environment:
+        Variables:
+          TableName: !Ref TableName
+      Events:
+        AddHoleStatusEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GopherHolesApi
+            Path: /holes/{holeId}/statuses
+            Method: POST
+
+  AddHoleStatusRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: addholestatuspolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt GopherHolesTable.Arn              
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+
+  GetAllHolesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/get-all-holes/
+      Handler: get-all-holes.lambdaHandler
+      Role: !GetAtt GetAllHolesRole.Arn
+      Environment:
+        Variables:
+          TableName: !Ref TableName
+      Events:
+        GetAllHolesEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GopherHolesApi
+            Path: /holes
+            Method: GET
+
+  GetAllHolesRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: getallholespolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                Resource: !GetAtt GopherHolesTable.Arn              
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+
+  GetHoleFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/get-hole/
+      Handler: get-hole.lambdaHandler
+      Role: !GetAtt GetHoleRole.Arn
+      Environment:
+        Variables:
+          TableName: !Ref TableName
+      Events:
+        GetHoleEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GopherHolesApi
+            Path: /holes/{holeId}
+            Method: GET
+
+  GetHoleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: getholepolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                Resource: !GetAtt GopherHolesTable.Arn              
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+
+  UpdateHoleFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/update-hole/
+      Handler: update-hole.lambdaHandler
+      Role: !GetAtt UpdateHoleRole.Arn
+      Environment:
+        Variables:
+          TableName: !Ref TableName
+      Events:
+        UpdateHoleEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GopherHolesApi
+            Path: /holes/{holeId}
+            Method: PUT
+
+  UpdateHoleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: updateholepolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: !GetAtt GopherHolesTable.Arn              
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute 
+
+  GopherHolesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      BillingMode: PAY_PER_REQUEST      
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S        
+      
