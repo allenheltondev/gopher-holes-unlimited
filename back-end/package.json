@@ -8,7 +8,7 @@
     "eslint-config-google": "^0.14.0"
   },
   "scripts": {
-    "deploy": "sam build -t template.yaml --parallel && sam package --output-template-file packaged.yaml --s3-bucket gopherholesunlimited --profile home && sam deploy --template-file packaged.yaml --stack-name gopher-holes-unlimited --capabilities CAPABILITY_IAM --profile home"
+    "deploy": "sam build -t template.yaml --parallel && sam package --output-template-file packaged.yaml --s3-bucket gopherholesunlimited && sam deploy --template-file packaged.yaml --stack-name gopher-holes-unlimited --capabilities CAPABILITY_IAM"
   },
   "license": "MIT"
 }
