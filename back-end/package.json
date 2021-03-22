@@ -8,7 +8,8 @@
     "eslint-config-google": "^0.14.0"
   },
   "scripts": {
-    "deploy": "sam build -t template.yaml --parallel && sam package --output-template-file packaged.yaml --s3-bucket gopherholesunlimited && sam deploy --template-file packaged.yaml --stack-name gopher-holes-unlimited --capabilities CAPABILITY_IAM"
+    "deploy": "sam build -t template.yaml --parallel && sam package --output-template-file packaged.yaml --s3-bucket gopherholesunlimited && sam deploy --template-file packaged.yaml --stack-name gopher-holes-unlimited --capabilities CAPABILITY_IAM",
+    "diagram": "cfn-dia draw.io -t template.yaml -o infrastructure/diagram.drawio -c && drawio infrastructure/diagram.drawio -o infrastructure/diagram.png"
   },
   "license": "MIT"
 }
