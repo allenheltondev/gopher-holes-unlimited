@@ -1,20 +1,20 @@
 const httpStatusCode = require('http-status-codes');
-const ErrorMessage = 'An error occurred loading the hole details.';
+const ErrorMessage = 'An error occurred loading the gopher details.';
 const dynamodb = require('aws-sdk/clients/dynamodb');
 const documentClient = new dynamodb.DocumentClient();
 
-exports.lambdaHandler = async (event, context) => {
+exports.handler = async (event, context) => {
   try {
-    const holes = await loadFromDynamo();
-    if (!holes) {
+    const gophers = await loadFromDynamo();
+    if (!gophers) {
       return {
         statusCode: httpStatusCode.NOT_FOUND,
-        body: JSON.stringify({ message: 'Could not find holes in the system' }),
+        body: JSON.stringify({ message: 'Could not find gophers in the system' }),
         headers: { 'Access-Control-Allow-Origin': '*' }
       };
     }
     else {
-      const summaries = mapHoleSummary(holes);
+      const summaries = mapGopherSummary(gophers);
       return {
         statusCode: httpStatusCode.OK,
         body: JSON.stringify(summaries),
@@ -32,12 +32,14 @@ exports.lambdaHandler = async (event, context) => {
   }
 };
 
-function mapHoleSummary(holes){
+function mapGopherSummary(gophers){
   const summaries = [];
-  holes.forEach(hole => {
+  gophers.forEach(gopher => {
     summaries.push({
-      id: hole.sk,
-      ...hole.location && {location: hole.location}
+      id: gopher.sk,
+      name: gopher.name,
+      ...gopher.type && { type: gopher.type},
+      ...gopher.location && {location: gopher.location}
     });
   });
 
@@ -49,7 +51,7 @@ async function loadFromDynamo() {
     TableName: process.env.TableName,
     KeyConditionExpression: 'pk = :pk',
     ExpressionAttributeValues: {
-      ':pk': 'hole'
+      ':pk': 'gopher'
     }
   };
 

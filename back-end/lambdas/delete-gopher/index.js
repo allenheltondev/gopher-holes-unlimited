@@ -3,7 +3,7 @@ const ErrorMessage = 'An error occurred deleting the gopher.';
 const dynamodb = require('aws-sdk/clients/dynamodb');
 const documentClient = new dynamodb.DocumentClient();
 
-exports.lambdaHandler = async (event, context) => {
+exports.handler = async (event, context) => {
   try{
   const id = event.pathParameters.gopherId;
 

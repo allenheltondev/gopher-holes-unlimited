@@ -3,25 +3,21 @@ const ErrorMessage = 'An error occurred loading the hole details.';
 const dynamodb = require('aws-sdk/clients/dynamodb');
 const documentClient = new dynamodb.DocumentClient();
 
-exports.lambdaHandler = async (event, context) => {
+exports.handler = async (event, context) => {
   try {
-    const id = event.pathParameters.holeId;
-    const hole = await loadFromDynamo(id);
-    if (!hole) {
+    const holes = await loadFromDynamo();
+    if (!holes) {
       return {
         statusCode: httpStatusCode.NOT_FOUND,
-        body: JSON.stringify({ message: 'Could not find hole with the specified id' }),
+        body: JSON.stringify({ message: 'Could not find holes in the system' }),
         headers: { 'Access-Control-Allow-Origin': '*' }
       };
     }
     else {
-      hole.id = hole.sk;
-      delete hole.pk;
-      delete hole.sk;
-
+      const summaries = mapHoleSummary(holes);
       return {
         statusCode: httpStatusCode.OK,
-        body: JSON.stringify(hole),
+        body: JSON.stringify(summaries),
         headers: { 'Access-Control-Allow-Origin': '*' }
       };
     }
@@ -36,17 +32,29 @@ exports.lambdaHandler = async (event, context) => {
   }
 };
 
-async function loadFromDynamo(id) {
+function mapHoleSummary(holes){
+  const summaries = [];
+  holes.forEach(hole => {
+    summaries.push({
+      id: hole.sk,
+      ...hole.location && {location: hole.location}
+    });
+  });
+
+  return summaries;
+}
+
+async function loadFromDynamo() {
   const params = {
     TableName: process.env.TableName,
-    Key: {
-      pk: 'hole',
-      sk: id
+    KeyConditionExpression: 'pk = :pk',
+    ExpressionAttributeValues: {
+      ':pk': 'hole'
     }
   };
 
-  const response = await documentClient.get(params).promise();
-  if (response && response.Item) {
-    return response.Item
+  const response = await documentClient.query(params).promise();
+  if (response && response.Items) {
+    return response.Items
   }
 }

@@ -4,7 +4,7 @@ const ErrorMessage = 'An error occurred saving the hold.';
 const dynamodb = require('aws-sdk/clients/dynamodb');
 const documentClient = new dynamodb.DocumentClient();
 
-exports.lambdaHandler = async (event, context) => {
+exports.handler = async (event, context) => {
   const item = JSON.parse(event.body);
 
   const id = await saveToDynamo(item);

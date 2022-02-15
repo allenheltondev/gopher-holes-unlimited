@@ -54,10 +54,81 @@ paths:
           $ref: '#/components/responses/BadRequest'
       x-amazon-apigateway-request-validator: Validate All
       x-amazon-apigateway-integration:
+        credentials:
+          Fn::Sub: ${AddGopherRole.Arn}
         uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AddGopherFunction.Arn}/invocations
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:dynamodb:action/PutItem
         httpMethod: POST
-        type: aws_proxy
+        type: aws
+        passthroughBehavior: 'never'
+        requestTemplates:
+          application/json:
+            Fn::Sub:
+              - |-
+                #set($epochDate = $context.requestTimeEpoch / 1000 )
+                {
+                  "TableName": "${TableName}",
+                  "Item":{
+                    "pk": { "S": "$context.requestTimeEpoch#$context.requestId"},
+                    "sk": { "S": "gopher#"},
+                    "GSI1PK": { "S": "gopher#"},
+                    "GSI1SK": { "S": "$epochDate"},
+                    "data": {
+                      "M": {
+                        "name": { "S": "$input.path('$.name')" },
+                        "location": { 
+                          "M": {
+                            #if("$input.path('$.location.latitude')" != "")
+                              "latitude": { "S": "$input.path('$.location.latitude')"},
+                              "longitude": { "S": "$input.path('$.location.longitude')"}
+                            #end
+                            #if("$input.path('$.location.city')" != ""))
+                              "city": { "S": "$input.path('$.location.city')" },
+                              "state": { "S": "$input.path('$.location.state')" }
+                              #if("$input.path('$.location.addressLine1')" != ""),
+                              "addressLine1": { "S": "$input.path('$.location.addressLine1')" }
+                              #end
+                              #if("$input.path('$.location.addressLine2')" != ""),
+                              "addressLine2": { "S": "$input.path('$.location.addressLine2')" }
+                              #end
+                            #end
+                            }
+                          }
+                        }
+                        #if("$input.path('$.picture')" != ""),
+                        "picture": { "S": "$input.path('$.picture')"}
+                        #end
+                        #if("$input.path('$.type')" != ""),
+                        "type": { "S": "$input.path('$.type')"}
+                        #end
+                        #if("$input.path('$.sex')" != ""),
+                        "sex": { "S": "$input.path('$.sex')"}
+                        #end
+                        #if("$input.path('$.status')" != ""),
+                        "status": { "S": "$input.path('$.status')"}
+                        #end
+                        #if("$input.path('$.color')" != ""),
+                        "color": { "S": "$input.path('$.color')"}
+                        #end
+                        #if("$input.path('$.comment')" != ""),
+                        "comment": { "S": "$input.path('$.comment')"}
+                        #end
+                      }
+                    }
+                  },
+                  "ReturnValues": "ALL_NEW"
+                }
+              - { TableName: { Ref: TableName } }
+        responses:
+          200:
+            statusCode: 201
+            responseTemplates:
+              application/json: |
+                #set($context.responseOverride.header.Access-Control-Allow-Origin = '*')
+                #set($inputRoot = $input.path('$'))
+                {
+                  "id": "$inputRoot.Item.pk.S"
+                }
     get:
       summary: View a list of all gophers
       description: Use this endpoint to view a list of all gophers in the system
@@ -343,7 +414,6 @@ components:
       type: object
       required:
         - name
-        - picture
         - location
       properties:
         id:

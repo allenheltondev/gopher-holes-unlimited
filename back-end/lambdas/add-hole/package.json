@@ -1,7 +1,7 @@
 {
   "name": "add-hole",
   "version": "1.0.0",
-  "description": "Add an hole into the system",
+  "description": "Adds a hole into the system",
   "main": "app.js",
   "author": "allenheltondev",
   "license": "MIT",

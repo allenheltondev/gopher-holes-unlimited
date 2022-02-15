@@ -3,7 +3,7 @@ const ErrorMessage = 'An error occurred updating the hole status.';
 const dynamodb = require('aws-sdk/clients/dynamodb');
 const documentClient = new dynamodb.DocumentClient();
 
-exports.lambdaHandler = async (event, context) => {
+exports.handler = async (event, context) => {
   try {
     const id = event.pathParameters.holeId;
     const item = JSON.parse(event.body);
