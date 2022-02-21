@@ -11,5 +11,8 @@
     "deploy": "sam build -t template.yaml --parallel && sam package --output-template-file packaged.yaml --s3-bucket gopherholesunlimited --profile home && sam deploy --template-file packaged.yaml --stack-name gopher-holes-unlimited --capabilities CAPABILITY_IAM --profile home",
     "diagram": "cfn-dia draw.io -t template.yaml -o infrastructure/diagram.drawio -c && drawio infrastructure/diagram.drawio -o infrastructure/diagram.png"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/util-dynamodb": "^3.52.0"
+  }
 }

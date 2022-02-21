@@ -69,8 +69,8 @@ paths:
                 {
                   "TableName": "${TableName}",
                   "Item":{
-                    "pk": { "S": "$context.requestTimeEpoch#$context.requestId"},
-                    "sk": { "S": "gopher#"},
+                    "pk": { "S": "$context.requestId"},
+                    "sk": { "S": "gopher#$context.requestTimeEpoch"},
                     "GSI1PK": { "S": "gopher#"},
                     "GSI1SK": { "S": "$epochDate"},
                     "data": {
@@ -82,7 +82,7 @@ paths:
                               "latitude": { "S": "$input.path('$.location.latitude')"},
                               "longitude": { "S": "$input.path('$.location.longitude')"}
                             #end
-                            #if("$input.path('$.location.city')" != ""))
+                            #if("$input.path('$.location.city')" != "")
                               "city": { "S": "$input.path('$.location.city')" },
                               "state": { "S": "$input.path('$.location.state')" }
                               #if("$input.path('$.location.addressLine1')" != ""),
@@ -106,6 +106,8 @@ paths:
                         #end
                         #if("$input.path('$.status')" != ""),
                         "status": { "S": "$input.path('$.status')"}
+                        #else
+                        ,"status": { "S": "unknown"}
                         #end
                         #if("$input.path('$.color')" != ""),
                         "color": { "S": "$input.path('$.color')"}
@@ -116,7 +118,7 @@ paths:
                       }
                     }
                   },
-                  "ReturnValues": "ALL_NEW"
+                  "ReturnValues": "NONE"
                 }
               - { TableName: { Ref: TableName } }
         responses:
@@ -127,7 +129,7 @@ paths:
                 #set($context.responseOverride.header.Access-Control-Allow-Origin = '*')
                 #set($inputRoot = $input.path('$'))
                 {
-                  "id": "$inputRoot.Item.pk.S"
+                  "id": "$context.requestId"
                 }
     get:
       summary: View a list of all gophers
@@ -143,10 +145,57 @@ paths:
                 $ref: '#/components/schemas/GopherSummary'                  
       x-amazon-apigateway-request-validator: Validate All
       x-amazon-apigateway-integration:
+        credentials:
+          Fn::Sub: ${GetAllGophersRole.Arn}
         uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetAllGophersFunction.Arn}/invocations
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:dynamodb:action/Query
         httpMethod: POST
-        type: aws_proxy
+        type: aws
+        passthroughBehavior: never
+        requestTemplates:
+          application/json:
+            Fn::Sub:  
+              - |-
+                {
+                  "TableName": "${TableName}",
+                  "IndexName": "GSI1",
+                  "KeyConditionExpression": "#GSI1PK = :GSI1PK",
+                  "ExpressionAttributeNames": {
+                    "#GSI1PK": "GSI1PK"
+                  },
+                  "ExpressionAttributeValues": {
+                    ":GSI1PK": { "S": "gopher#" }
+                  }
+                }
+              - { TableName: { Ref: TableName } }
+        responses:
+          200:
+            statusCode: 200
+            responseTemplates:
+              application/json: |
+                #set($context.reponseOverride.header.Access-Control-Allow-Origin = '*')
+                #set($inputRoot = $input.path('$'))
+                {
+                  "items": [
+                    #foreach($elem in $inputRoot.Items) {
+                      "id": "$elem.pk.S",
+                      "name": "$elem.data.M.name.S",
+                      "location": {
+                        #if("$elem.data.M.location.M.city.S" != "")
+                        "city": "$elem.data.M.location.M.city.S",
+                        "state": "$elem.data.M.location.M.state.S"
+                        #else
+                        "latitude": "$elem.data.M.location.M.latitude.S",
+                        "longitude": "$elem.data.M.location.M.longitude.S"
+                        #end
+                      }
+                      #if("$elem.data.M.location.M.type.S" != ""),
+                      "type": "$elem.data.M.location.M.type.S"
+                      #end
+                    }
+                    #end
+                  ]
+                }
 
   /gophers/{gopherId}/statuses:
       parameters:
@@ -243,9 +292,7 @@ paths:
         uri:
           Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteGopherFunction.Arn}/invocations
         httpMethod: POST
-        type: aws_proxy
-
-                
+        type: aws_proxy                
     
   /holes:
     post:
@@ -270,10 +317,73 @@ paths:
           $ref: '#/components/responses/BadRequest'
       x-amazon-apigateway-request-validator: Validate All
       x-amazon-apigateway-integration:
+        credentials:
+          Fn::Sub: ${AddHoleRole.Arn}
         uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AddHoleFunction.Arn}/invocations
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:dynamodb:action/PutItem
         httpMethod: POST
-        type: aws_proxy
+        type: aws
+        passthroughBehavior: 'never'
+        requestTemplates:
+          application/json:
+            Fn::Sub:
+              - |-
+                #set($epochDate = $context.requestTimeEpoch / 1000 )
+                {
+                  "TableName": "${TableName}",
+                  "Item":{
+                    "pk": { "S": "$context.requestId"},
+                    "sk": { "S": "hole#$context.requestTimeEpoch"},
+                    "GSI1PK": { "S": "hole#"},
+                    "GSI1SK": { "S": "$epochDate"},
+                    "data": {
+                      "M": {
+                        "location": { 
+                          "M": {
+                            #if("$input.path('$.location.latitude')" != "")
+                              "latitude": { "S": "$input.path('$.location.latitude')"},
+                              "longitude": { "S": "$input.path('$.location.longitude')"}
+                            #end
+                            #if("$input.path('$.location.city')" != "")
+                              "city": { "S": "$input.path('$.location.city')" },
+                              "state": { "S": "$input.path('$.location.state')" }
+                              #if("$input.path('$.location.addressLine1')" != ""),
+                              "addressLine1": { "S": "$input.path('$.location.addressLine1')" }
+                              #end
+                              #if("$input.path('$.location.addressLine2')" != ""),
+                              "addressLine2": { "S": "$input.path('$.location.addressLine2')" }
+                              #end
+                            #end
+                            }
+                          }
+                        }
+                        #if("$input.path('$.gopherId')" != ""),
+                        "gopherId": { "S": "$input.path('$.gopherId')"}
+                        #end
+                        #if("$input.path('$.status')" != ""),
+                        "status": { "S": "$input.path('$.status')"}
+                        #else
+                        ,"status": { "S": "visible"}
+                        #end
+                        #if("$input.path('$.comment')" != ""),
+                        "comment": { "S": "$input.path('$.comment')"}
+                        #end
+                      }
+                    }
+                  },
+                  "ReturnValues": "NONE"
+                }
+              - { TableName: { Ref: TableName } }
+        responses:
+          200:
+            statusCode: 201
+            responseTemplates:
+              application/json: |
+                #set($context.responseOverride.header.Access-Control-Allow-Origin = '*')
+                #set($inputRoot = $input.path('$'))
+                {
+                  "id": "$context.requestId"
+                }
     get:
       summary: View a list of all holes
       description: To view a list of all the gopher holes, use this endpoint. Returns all holes by default, but has an optional query parameter to filter by status
@@ -296,10 +406,56 @@ paths:
                 $ref: '#/components/schemas/HoleSummary'
       x-amazon-apigateway-request-validator: Validate All
       x-amazon-apigateway-integration:
+        credentials:
+          Fn::Sub: ${GetAllHolesRole.Arn}
         uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetAllHolesFunction.Arn}/invocations
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:dynamodb:action/Query
         httpMethod: POST
-        type: aws_proxy
+        type: aws
+        passthroughBehavior: never
+        requestTemplates:
+          application/json:
+            Fn::Sub:  
+              - |-
+                {
+                  "TableName": "${TableName}",
+                  "IndexName": "GSI1",
+                  "KeyConditionExpression": "#GSI1PK = :GSI1PK",
+                  "ExpressionAttributeNames": {
+                    "#GSI1PK": "GSI1PK"
+                  },
+                  "ExpressionAttributeValues": {
+                    ":GSI1PK": { "S": "hole#" }
+                  }
+                }
+              - { TableName: { Ref: TableName } }
+        responses:
+          200:
+            statusCode: 200
+            responseTemplates:
+              application/json: |
+                #set($context.reponseOverride.header.Access-Control-Allow-Origin = '*')
+                #set($inputRoot = $input.path('$'))
+                {
+                  "items": [
+                    #foreach($elem in $inputRoot.Items) {
+                      "id": "$elem.pk.S",
+                      "location": {
+                        #if("$elem.data.M.location.M.city.S" != "")
+                        "city": "$elem.data.M.location.M.city.S",
+                        "state": "$elem.data.M.location.M.state.S"
+                        #else
+                        "latitude": "$elem.data.M.location.M.latitude.S",
+                        "longitude": "$elem.data.M.location.M.longitude.S"
+                        #end
+                      }
+                      #if("$elem.data.M.location.M.gopherId.S" != ""),
+                      "type": "$elem.data.M.location.M.gopherId.S"
+                      #end
+                    }
+                    #end
+                  ]
+                }
           
   /holes/{holeId}/statuses:
     parameters:
@@ -454,48 +610,7 @@ components:
           description: Color of the Gopher's fur
           example: brown
         location:
-          oneOf:
-            - type: object
-              required:
-                - latitude
-                - longitude
-              properties:
-                latitude:
-                  type: string
-                  minLength: 1
-                  description: Latitude location of the gopher's whereabouts
-                  example: "33.067067"
-                longitude:
-                  type: string
-                  minLength: 1
-                  description: Longitude location of the gopher's whereabouts
-                  example: "-96.801599"
-            - type: object
-              required: 
-                - city
-                - state
-              properties:
-                addressLine1:
-                  type: string
-                  description: Line 1 of the address of the known whereabouts
-                  example: 123 Main Street
-                addressLine 2:
-                  type: string
-                  description: Line 2 of the address of the known whereabouts
-                  example: 'Apt #2212'
-                city:
-                  type: string
-                  minLength: 1
-                  description: City of the known whereabouts
-                  example: Plano
-                state:
-                  type: string
-                  minLength: 1
-                  description: State of the known whereabouts
-                  example: TX
-          example:
-            latitude: "33.067067"
-            longitude: "-96.801599"
+          $ref: '#/components/schemas/Location'
         comment:
           type: string
           description: Text comment with any additional details 
@@ -518,6 +633,52 @@ components:
                 minLength: 1
                 description: Name of the associated gopher 
                 example: Carla
+
+    Location:
+      description: Where it is located
+      oneOf:
+        - type: object
+          required:
+            - latitude
+            - longitude
+          properties:
+            latitude:
+              type: string
+              minLength: 1
+              description: Latitude location of the known whereabouts
+              example: "33.067067"
+            longitude:
+              type: string
+              minLength: 1
+              description: Longitude location of the known whereabouts
+              example: "-96.801599"
+        - type: object
+          required: 
+            - city
+            - state
+          properties:
+            addressLine1:
+              type: string
+              description: Line 1 of the address of the known whereabouts
+              example: 123 Main Street
+            addressLine 2:
+              type: string
+              description: Line 2 of the address of the known whereabouts
+              example: 'Apt #2212'
+            city:
+              type: string
+              minLength: 1
+              description: City of the known whereabouts
+              example: Plano
+            state:
+              type: string
+              minLength: 1
+              description: State of the known whereabouts
+              example: TX
+      example:
+        latitude: "33.067067"
+        longitude: "-96.801599"
+        
     GopherSummary:
       description: High level information about a gopher
       type: array
@@ -603,22 +764,7 @@ components:
           description: The gopher who dug the hole
           example: igdLLki4no9ey1aN2rAB3s
         location:
-          type: object
-          description: Known location of the gopher
-          required:
-            - latitude
-            - longitude
-          properties:
-            latitude:
-              type: string
-              minLength: 1
-              description: Latitude location of the hole
-              example: "33.067067"
-            longitude:
-              type: string
-              minLength: 1
-              description: Longitude location of the hole
-              example: "-96.801599"
+          $ref: '#/components/schemas/Location'
         status:
           type: string
           enum: [filled, visible]
@@ -628,6 +774,7 @@ components:
             type: string
             description: The hole comment
             example: This one is huge! I stepped right in it!
+    
     HoleSummary:
       description: High level information about a gopher hole
       type: array
@@ -659,6 +806,10 @@ components:
                 minLength: 1
                 description: Longitude location of the hole
                 example: "-96.801599"
+          gopherId:
+            type: string
+            description: Unique identifier of the gopher that dug the hole
+            example: lag91345wgli154098dghb908
   responses:
     Created:
       description: Successfully added into the system

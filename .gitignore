@@ -2,6 +2,7 @@
 .aws-sam
 built/
 packaged.yaml
+samconfig.toml
 
 # Created by https://www.gitignore.io/api/osx,node,linux,python,pycharm,windows,visualstudiocode
 # Edit at https://www.gitignore.io/?templates=osx,node,linux,python,pycharm,windows,visualstudiocode

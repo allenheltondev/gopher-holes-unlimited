@@ -16,6 +16,8 @@ Globals:
     Tracing: Active
     Timeout: 3
     Handler: index.handler
+    Layers:
+      - !Ref DependencyLayer
     Environment:
       Variables:
         AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
@@ -26,6 +28,16 @@ Globals:
       AllowOrigin: "'*'"
 
 Resources:
+  DependencyLayer:
+    Type: AWS::Serverless::LayerVersion
+    Metadata:
+      BuildMethod: nodejs14.x
+    Properties:
+      LayerName: gopherholes-dependency-layer
+      ContentUri: layers/
+      CompatibleRuntimes:
+        - nodejs14.x
+
   GopherHolesApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -62,6 +74,81 @@ Resources:
                 Resource: 
                   - !GetAtt GopherHolesTable.Arn
 
+  GetAllGophersRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AWSXRayDaemonWriteAccess
+      Policies:
+        - PolicyName: GetAllGophersPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                Resource: 
+                  - !Join [ "/", [ !GetAtt GopherHolesTable.Arn, "index/GSI1" ]]
+
+  AddHoleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AWSXRayDaemonWriteAccess
+      Policies:
+        - PolicyName: AddHolePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: 
+                  - !GetAtt GopherHolesTable.Arn
+
+  GetAllHolesRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AWSXRayDaemonWriteAccess
+      Policies:
+        - PolicyName: GetAllHolesPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                Resource: 
+                  - !Join [ "/", [ !GetAtt GopherHolesTable.Arn, "index/GSI1" ]]
+
   AddGopherStatusFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -91,29 +178,6 @@ Resources:
             FilterPolicy:
               gopher-type: 
                 - gopher
-
-  GetAllGophersFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: lambdas/get-all-gophers/
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - Version: 2012-10-17
-          Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:Query
-              Resource: !GetAtt GopherHolesTable.Arn
-      Environment:
-        Variables:
-          TableName: !Ref TableName
-      Events:
-        GetAllGophersEvent:
-          Type: Api
-          Properties:
-            RestApiId: !Ref GopherHolesApi
-            Path: /gophers
-            Method: GET
 
   GetGopherFunction:
     Type: AWS::Serverless::Function
@@ -184,29 +248,6 @@ Resources:
             Path: /gophers/{gopherId}
             Method: DELETE
 
-  AddHoleFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: lambdas/add-hole/
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - Version: 2012-10-17
-          Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:PutItem
-              Resource: !GetAtt GopherHolesTable.Arn 
-      Environment:
-        Variables:
-          TableName: !Ref TableName
-      Events:
-        AddHoleEvent:
-          Type: Api
-          Properties:
-            RestApiId: !Ref GopherHolesApi
-            Path: /holes
-            Method: POST
-
   AddHoleStatusFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -229,29 +270,6 @@ Resources:
             RestApiId: !Ref GopherHolesApi
             Path: /holes/{holeId}/statuses
             Method: POST
-
-  GetAllHolesFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: lambdas/get-all-holes/
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - Version: 2012-10-17
-          Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:Query
-              Resource: !GetAtt GopherHolesTable.Arn 
-      Environment:
-        Variables:
-          TableName: !Ref TableName
-      Events:
-        GetAllHolesEvent:
-          Type: Api
-          Properties:
-            RestApiId: !Ref GopherHolesApi
-            Path: /holes
-            Method: GET
 
   GetHoleFunction:
     Type: AWS::Serverless::Function
@@ -299,6 +317,33 @@ Resources:
             Path: /holes/{holeId}
             Method: PUT
 
+  GopherHolesTableStream:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/table-stream/
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref GopherAddedSNSTopic
+            - Effect: Allow
+              Action:
+                - dynamodb:DescribeStream
+                - dynamodb:GetRecords
+                - dynamodb:GetShardIterator
+                - dynamodb:ListStreams
+              Resource: !Join [ '', [!GetAtt GopherHolesTable.Arn, '/stream/*']]
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt ProcessTableDeadLetterQueue.Arn
+      Environment:
+        Variables:
+          GOPHER_ADDED_TOPIC_ARN: !Ref GopherAddedSNSTopic  
+
   GopherHolesTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -313,7 +358,39 @@ Resources:
         - AttributeName: pk
           AttributeType: S
         - AttributeName: sk
-          AttributeType: S        
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  ProcessTableStream:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt GopherHolesTable.StreamArn
+      FunctionName: !GetAtt GopherHolesTableStream.Arn
+      StartingPosition: TRIM_HORIZON
+      DestinationConfig:
+        OnFailure:
+          Destination: !GetAtt ProcessTableDeadLetterQueue.Arn
+      BatchSize: 100
+      MaximumBatchingWindowInSeconds: 5
+      MaximumRecordAgeInSeconds: 604800
+      MaximumRetryAttempts: 5
+
+  ProcessTableDeadLetterQueue:
+    Type: AWS::SQS::Queue
   
   GopherAddedSNSTopic:
     Type: AWS::SNS::Topic
