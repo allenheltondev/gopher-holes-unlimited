@@ -1,0 +1,414 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "Load Job Detail",
+  "States": {
+    "Load Job Detail": {
+      "Type": "Task",
+      "Resource": "${DynamoDbGetItem}",
+      "Parameters": {
+        "TableName": "${TableName}",
+        "Key": {
+          "pk": {
+            "S.$": "$.id"
+          },
+          "sk": {
+            "S": "job#addGopher"
+          }
+        }
+      },
+      "Next": "Does Job Exist?",
+      "ResultSelector": {
+        "detail.$": "$.Item"
+      },
+      "ResultPath": "$.job"
+    },
+    "Does Job Exist?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Not": {
+            "Variable": "$.job.detail.pk",
+            "IsPresent": true
+          },
+          "Next": "Fail - Job Not Found"
+        },
+        {
+          "And": [
+            {
+              "Variable": "$.job.detail.status.S",
+              "IsPresent": true
+            },
+            {
+              "Variable": "$.job.detail.status.S",
+              "StringEquals": "Pending"
+            }
+          ],
+          "Next": "Mark Job In Progress"
+        }
+      ],
+      "Default": "Fail - Job Already In Progress"
+    },    
+    "Fail - Job Not Found": {
+      "Type": "Fail",
+      "Error": "JobNotFound",
+      "Cause": "A job with the provided id could not be found"
+    },    
+    "Fail - Job Already In Progress": {
+      "Type": "Fail",
+      "Error": "JobInProgress",
+      "Cause": "Unable to start job because it is already in progress"
+    },
+    "Mark Job In Progress": {
+      "Type": "Task",
+      "Resource": "${DynamoDbUpdateItem}",
+      "Parameters": {
+        "TableName": "${TableName}",
+        "Key": {
+          "pk": {
+            "S.$": "$.id"
+          },
+          "sk": {
+            "S": "job#"
+          }
+        },
+        "UpdateExpression": "SET #status = :status",
+        "ExpressionAttributeNames": {
+          "#status": "status"
+        },
+        "ExpressionAttributeValues": {
+          ":status": {
+            "S": "In Progress"
+          }
+        }
+      },
+      "Next": "Add Gopher",
+      "ResultPath": null
+    },
+    "Add Gopher": {
+      "Type": "Task",
+      "Resource": "${DynamoDbPutItem}",
+      "Parameters": {
+        "TableName": "${TableName}",
+        "Item": {
+          "pk": {
+            "S.$": "$.id"
+          },
+          "sk": {
+            "S": "gopher#"
+          },
+          "GSI1PK": {
+            "S": "gopher#"
+          },
+          "GSI1SK": {
+            "S.$": "$$.State.EnteredTime"
+          },
+          "data.$": "$.job.detail.data"          
+        }
+      },
+      "Next": "WebSocket Update - Gopher Added",
+      "ResultPath": null,
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "Mark Job Failed",
+          "ResultPath": "$.error.detail"
+        }
+      ]
+    },
+    "Mark Job Failed": {
+      "Type": "Task",
+      "Resource": "${DynamoDbUpdateItem}",
+      "Parameters": {
+        "TableName": "${TableName}",
+        "Key": {
+          "pk": {
+            "S.$": "$.id"
+          },
+          "sk": {
+            "S": "job#"
+          }
+        },
+        "UpdateExpression": "SET #status = :status, #error = :error",
+        "ExpressionAttributeNames": {
+          "#status": "status",
+          "#error": "error"
+        },
+        "ExpressionAttributeValues": {
+          ":status": {
+            "S": "Failed"
+          },
+          ":error": {
+            "S.$": "$.error.detail"
+          }
+        }
+      },
+      "Next": "Fail - Unhandled Exception",
+      "ResultPath": null
+    },
+    "Fail - Unhandled Exception": {
+      "Type": "Fail",
+      "Error": "UnhandledException",
+      "Cause": "Something went wrong"
+    },
+    "WebSocket Update - Gopher Added": {
+      "Type": "Task",
+      "Resource": "${EventBridgePutEvents}",
+      "Parameters": {
+        "Entries": [
+          {
+            "Detail": {
+              "message": "Adding to global gopher registry",
+              "entityId.$": "$.id"
+            },
+            "DetailType": "Entity Updated",
+            "Source": "GHU"
+          }
+        ]
+      },
+      "Next": "Gopher Location Type?",
+      "ResultPath": null,
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "Mark Job Failed",
+          "ResultPath": "$.error.detail"
+        }
+      ]
+    },
+    "Gopher Location Type?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "And": [
+            {
+              "Variable": "$.job.detail.data.M.location.M.longitude.S",
+              "IsPresent": true
+            },
+            {
+              "Not": {
+                "Variable": "$.job.detail.data.M.location.M.longitude.S",
+                "StringMatches": ""
+              }
+            }
+          ],
+          "Next": "Set Lat/Long Location"
+        }
+      ],
+      "Default": "Set Address Location"
+    },
+    "Set Lat/Long Location": {
+      "Type": "Pass",
+      "Parameters": {
+        "value.$": "States.Format('{}#{}', $.job.detail.data.M.location.M.latitude.S, $.job.detail.data.M.location.M.longitude.S)"
+      },      
+      "ResultPath": "$.location",
+      "Next": "Lookup Holes at Same Location"
+    },
+    "Set Address Location": {
+      "Type": "Pass",
+      "Parameters": {
+        "value.$": "States.Format('{}#{}#{}', $.job.detail.data.M.location.M.addressLine1.S, $.job.detail.data.M.location.M.city.S, $.job.detail.data.M.location.M.state.S)"
+      },
+      "ResultPath": "$.location",
+      "Next": "Lookup Holes at Same Location"
+    },
+    "Lookup Holes at Same Location": {
+      "Type": "Task",
+      "Parameters": {
+        "TableName": "${TableName}",
+        "IndexName": "${LocationIndexName}",
+        "KeyConditionExpression": "#GSI2PK = :GSI2PK and #GSI2SK = :GSI2SK",
+        "ExpressionAttributeNames": {
+          "#GSI2PK": "GSI2PK",
+          "#GSI2SK": "GSI2SK"
+        },
+        "ExpressionAttributeValues": {
+          ":GSI2PK": {
+            "S.$": "$.location.value"
+          },
+          ":GSI2SK": {
+            "S": "hole#"
+          }
+        }
+      },
+      "Resource": "${DynamoDbQuery}",
+      "Next": "WebSocket Update - Linking Holes",
+      "ResultPath": "$.holes",
+      "ResultSelector": {
+        "items.$": "$.Items",
+        "length.$": "$.Count"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "Mark Job Failed",
+          "ResultPath": "$.error.detail"
+        }
+      ]
+    },
+    "WebSocket Update - Linking Holes": {
+      "Type": "Task",
+      "Resource": "${EventBridgePutEvents}",
+      "Parameters": {
+        "Entries": [
+          {
+            "Detail": {
+              "message": "Locating holes at same location",
+              "entityId.$": "$.id"
+            },
+            "DetailType": "Entity Updated",
+            "Source": "GHU"
+          }
+        ]
+      },
+      "Next": "Link Holes To Gopher",
+      "ResultPath": null,
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "Mark Job Failed",
+          "ResultPath": "$.error.detail"
+        }
+      ]
+    },
+    "Link Holes To Gopher": {
+      "Type": "Map",
+      "Iterator": {
+        "StartAt": "Link Hole to Gopher",
+        "States": {
+          "Link Hole to Gopher": {
+            "Type": "Task",
+            "Resource": "${DynamoDbPutItem}",
+            "Parameters": {
+              "TableName": "${TableName}",
+              "Item": {
+                "pk": {
+                  "S.$": "$.hole.pk.S"
+                },
+                "sk": {
+                  "S.$": "States.Format('link#{}', $.gopherId)"
+                },
+                "GSI1PK": {
+                  "S.$": "$.gopherId"
+                },
+                "GSI1SK": {
+                  "S.$": "States.Format('link#{}', $.hole.pk.S)"
+                },
+                "description": {
+                  "S.$": "$.hole.data.M.description.S"
+                }
+              }
+            },
+            "End": true,
+            "ResultPath": null
+          }
+        }
+      },
+      "ItemsPath": "$.holes.items",
+      "ResultPath": null,
+      "MaxConcurrency": 40,
+      "Parameters": {
+        "gopherId.$": "$.id",
+        "hole.$": "$$.Map.Item.Value"
+      },
+      "Next": "WebSocket Update - Wrapping Up"
+    },
+    "WebSocket Update - Wrapping Up": {
+      "Type": "Task",
+      "Resource": "${EventBridgePutEvents}",
+      "Parameters": {
+        "Entries": [
+          {
+            "Detail": {
+              "message.$": "States.Format('Letting the world know about {}', $.job.detail.data.M.name.S)",
+              "entityId.$": "$.id"
+            },
+            "DetailType": "Entity Updated",
+            "Source": "GHU"
+          }
+        ]
+      },
+      "Next": "Mark Job Success",
+      "ResultPath": null,
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "Mark Job Failed",
+          "ResultPath": "$.error.detail"
+        }
+      ]
+    },
+    "Mark Job Success": {
+      "Type": "Task",
+      "Resource": "${DynamoDbUpdateItem}",
+      "Parameters": {
+        "TableName": "${TableName}",
+        "Key": {
+          "pk": {
+            "S.$": "$.id"
+          },
+          "sk": {
+            "S": "job#"
+          }
+        },
+        "UpdateExpression": "SET #status = :status, #result = :result",
+        "ExpressionAttributeNames": {
+          "#status": "status",
+          "#result": "result"
+        },
+        "ExpressionAttributeValues": {
+          ":status": {
+            "S": "Succeeded"
+          },
+          ":result": {
+            "M": {
+              "gopherId": {
+                "S.$": "$.id"
+              },
+              "linkedHoles": {
+                "N.$": "States.Format('{}', $.holes.length)"
+              }
+            }
+          }
+        }
+      },
+      "Next": "Publish Gopher Added Message",
+      "ResultPath": null,
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "Mark Job Failed",
+          "ResultPath": "$.error.detail"
+        }
+      ]
+    },
+    "Publish Gopher Added Message": {
+      "Type": "Task",
+      "Resource": "${SnsPublish}",
+      "Parameters": {
+        "TopicArn": "${GopherAddedTopic}",
+        "Message": {
+          "id.$": "$.id",
+          "name.$": "$.job.detail.data.M.name.S"
+        }
+      },
+      "Next": "Success",
+      "ResultPath": null
+    },
+    "Success": {
+      "Type": "Succeed"
+    }
+  }
+}

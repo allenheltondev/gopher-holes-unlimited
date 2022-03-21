@@ -1,0 +1,13 @@
+{
+  "name": "link-unlink-gopher-hole",
+  "version": "1.0.0",
+  "description": "Creates or deletes a link between a gopher and gopher hole for easy lookups",
+  "main": "index.js",
+  "author": "allenheltondev",
+  "license": "MIT",
+  "scripts": {},
+  "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.52.0",
+    "@aws-sdk/util-dynamodb": "^3.52.0"
+  }
+}

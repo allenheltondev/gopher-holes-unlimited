@@ -1,0 +1,17 @@
+{
+  "name": "gopher-holes-unlimited-dependency-layer",
+  "version": "1.0.0",
+  "description": "Dependency layer for lambda functions",
+  "author": "allenheltondev",
+  "license": "MIT",
+  "scripts": {},
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.52.0",
+    "@aws-sdk/client-sfn": "^3.54.1",
+    "@aws-sdk/client-sns": "^3.52.0",
+    "@aws-sdk/util-dynamodb": "^3.52.0",
+    "http-status-codes": "^2.2.0",
+    "short-uuid": "^4.2.0",
+    "@aws-sdk/client-eventbridge": "^3.52.0"
+  }
+}

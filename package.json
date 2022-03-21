@@ -1,0 +1,14 @@
+{
+  "name": "gopher-holes-unlimited",
+  "version": "1.0.0",
+  "description": "This is an example application that uses OAS3.0 to define an API. It is an fictional business to track gophers and holes",
+  "devDependencies": {
+    "eslint": "^8.11.0"
+  },
+  "scripts": {
+    "build": "sam build --parallel --cached",
+    "deploy": "sam deploy",
+    "diagram": "cfn-dia draw.io -t template.yaml -o diagrams/diagram.drawio -c && drawio diagrams/diagram.drawio -o diagrams/diagram.png"
+  },
+  "license": "MIT"
+}

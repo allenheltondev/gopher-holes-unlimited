@@ -1,0 +1,16 @@
+{
+  "name": "table-stream",
+  "version": "1.0.0",
+  "description": "Process dynamodb table record changes",
+  "main": "app.js",
+  "author": "allenheltondev",
+  "license": "MIT",
+  "scripts": {},
+  "devDependencies": {
+    "@aws-sdk/client-sfn": "^3.54.1",
+    "@aws-sdk/client-sns": "^3.52.0",
+    "@aws-sdk/util-dynamodb": "^3.52.0",
+    "@aws-sdk/client-eventbridge": "^3.52.0"
+  },
+  "dependencies": {}
+}

@@ -1,0 +1,214 @@
+asyncapi: 2.3.0
+info:
+  title: Gopher Holes Unlimited
+  version: 1.0.0
+  description: >
+    Describes the events used in Gopher Holes Unlimited. Contained in the spec are:
+
+    * WebSocket connection information
+
+    * EventBridge event configuration used internally in teh application
+
+    * SNS message details when gopher updates are made in the system
+
+defaultContentType: application/json
+servers:
+  private:
+    url: ws.gopherholesunlimited.com
+    protocol: wss
+    description: >
+      Connection url for the WebSocket. When creating a new gopher, status updates are pushed in the form of WebSocket notifications.
+
+      ### Authentication
+
+      To connect to this WebSocket, you must get a valid auth token from the
+      *create-test-jwt* lambda function from the [WebSocket microservice](https://github.com/allenheltondev/serverless-websockets). You can use the token in one of two
+      ways:
+        * As a query parameter on *$connect* called `auth_token`
+        * As a comma separated value in the `Sec-WebSocket-Protocol` header
+            * The `Sec-WebSocket-Protocol` header is required on connect. It must have a value of `websocket`. If using this header as the auth method, the value would be `websocket, <auth token>`
+
+      ### Example Connection Url
+
+      >     wss://ws.gopherholesunlimited.com?access_token=eyJhbG
+
+channels:
+  /:
+    publish:
+      operationId: sendMessage
+      tags:
+        - name: WebSocket
+      message:
+        oneOf:
+          - $ref: '#/components/messages/subscribe'
+          - $ref: '#/components/messages/unsubscribe'
+    subscribe:
+      operationId: receiveSubscriptionMessage
+      tags:
+        - name: WebSocket
+      message:
+        $ref: '#/components/messages/receiveSubscriptionMessage'
+  
+  GopherAdded:
+    subscribe:
+      operationId: gopherAdded
+      description: Event triggered when a new gopher is added in the system
+      tags:
+        - name: SNS
+      message:
+        $ref: '#/components/messages/gopherAddedMessage'  
+
+  GopherStatusChanged:
+    subscribe:
+      operationId: gopherStatusChanged
+      description: Event triggered when a gopher status is updated
+      tags:
+        - name: SNS
+      message:
+        $ref: '#/components/messages/gopherStatusChangedMessage'
+
+  GopherUpdated:
+    subscribe:
+      operationId: gopherUpdated
+      description: Event triggered when details about a gopher have changed
+      tags:
+        - name: SNS
+      message:
+        $ref: '#/components/messages/gopherUpdatedMessage'
+
+components:
+  messages:
+    subscribe:
+      name: subscribe
+      title: Subscribe for Updates
+      summary: Subscribes for updates when an entity is updated in the system
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/subscribe'
+      examples:
+        - payload:
+            action: subscribe
+            entityId: myEntityId
+    
+    unsubscribe:
+      name: unsubscribe
+      title: Unsubscribe from Updates
+      summary: Removes subscription for updates when an entity is updated in the system
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/unsubscribe'
+      examples:
+        - payload:
+            action: unsubscribe
+            entityId: myEntityId
+
+    receiveSubscriptionMessage:
+      name: receiveMessage
+      title: Receive Push Notification
+      summary: Push notification received when a subscribed entity has been updated
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/receiveSubscriptionMessage'
+      examples:
+        - payload:
+            type: Entity Updated
+            entityId: myEntityId
+            message: Status changed from 'New' to 'In Progress'
+
+    gopherStatusChangedMessage:
+      name: gopherStatusChanged
+      title: Notify subscribers when a gopher status is updated
+      summary: >-
+        When a gopher status is changed, notify subscribers so they are aware
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/gopherSnsMessage'
+      examples:
+        - payload:
+            id: 83425-odfgh94-jsdfg03
+            name: Bucktooth Joe            
+      
+    gopherAddedMessage:
+      name: gopherAddedMessage
+      title: Notify subscribers when a new gopher is added
+      summary: >-
+        When a new gopher is added in the system, notify users so they can watch for them
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/gopherSnsMessage'
+      examples:
+        - payload:
+            id: 83425-odfgh94-jsdfg03
+            name: Bucktooth Joe
+
+    gopherUpdatedMessage:
+      name: gopherUpdatedMessage
+      title: Notify subscribers when gopher details are updated
+      summary: >-
+        When any information changes with a gopher, notify subscribers
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/gopherSnsMessage'
+      examples:
+        - payload:
+            id: 83425-odfgh94-jsdfg03
+            name: Bucky
+
+  schemas:
+    subscribe:
+      type: object
+      required:
+        - action
+        - entityId
+      properties:
+        action:
+          const: subscribe
+        entityId:
+          type: string
+          description: Unique identifier of the entity to subscribe for updates
+          example: myEntityId
+
+    unsubscribe:
+      type: object
+      required:
+        - action
+        - entityId
+      properties:
+        action:
+          const: unsubscribe
+        entityId:
+          type: string
+          description: Unique identifier of the entity to unsubscribe from
+          example: myEntityId
+
+    receiveSubscriptionMessage:
+      type: object
+      required:
+        - type
+        - entityId
+      properties:
+        type:
+          const: Entity Updated
+        entityId:
+          type: string
+          description: Unique identifier of the entity that was updated
+          example: myEntityId
+        message:
+          type: string
+          description: Message provided by the system related to the entity update
+          example: Status changed from 'New' to 'In Progress'
+          
+    gopherSnsMessage:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the gopher
+          example: 904j84-rtjdxsfgh-348g-934k
+        name:
+          type: string
+          description: Name of the gopher
+          example: Bucktooth Joe    

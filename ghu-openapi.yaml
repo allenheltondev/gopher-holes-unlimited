@@ -1,0 +1,975 @@
+openapi: 3.0.0
+info:
+  title: Gopher Holes Unlimited API!
+  description: |
+    Gopher Holes Unlimited (GHU) is a fictional website to track gophers, holes, and our continuous quest to keep them from destroying our gardens.
+
+    This API is designed to help illustrate the capabilities of OAS3.0 in a fun and meaningful way.
+
+    ![Gopher Holes Unlimited](https://readysetcloud.s3.amazonaws.com/GHU.png)
+  version: 1.0.0
+tags:
+  - name: Gophers
+    description: The little varmints themselves
+  - name: Holes
+    description: Details on the gopher holes
+
+servers:
+  - description: test
+    url: https://c5dbc886-b8ab-48c8-907b-d34893b05569.mock.pstmn.io
+  - description: prod
+    url: https://api.gopherholesunlimited.com
+
+x-amazon-apigateway-request-validators:
+  Validate All:
+    validateRequestParameters: true
+    validateRequestBody: true
+x-amazon-apigateway-gateway-responses:
+  BAD_REQUEST_BODY:
+    statusCode: 400
+    responseTemplates:
+      application/json: '{ "message": "$context.error.validationErrorString" }'
+
+paths:
+  /gophers:
+    post:
+      summary: Track a new gopher
+      description: When you find a new gopher, add it to the list with this endpoint. Keeping track of gophers helps the community know where they are and where not to plant their garden.
+      tags:
+        - Gophers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Gopher'
+      responses:
+        202:
+          $ref: '#/components/responses/Accepted'
+          x-postman-variables:
+            - type: save
+              name: gopherId
+              path: .id
+        400:
+          $ref: '#/components/responses/BadRequest'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        credentials:
+          Fn::Sub: ${AddGopherRole.Arn}
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:dynamodb:action/PutItem
+        httpMethod: POST
+        type: aws
+        passthroughBehavior: 'never'
+        requestTemplates:
+          application/json:
+            Fn::Sub:
+              - |-
+                #set($inputRoot = $input.path('$'))
+                {
+                  "TableName": "${TableName}",
+                  "Item": {
+                    "pk": { "S": "$context.requestId"},
+                    "sk": { "S": "job#addGopher"},
+                    "status": { "S": "Pending" },
+                    "data": {
+                      "M": {
+                        "name": { "S": "$input.path('$.name')" },
+                        "location": { 
+                          "M": {
+                              "latitude": { "S": "$input.path('$.location.latitude')"},
+                              "longitude": { "S": "$input.path('$.location.longitude')"},
+                              "city": { "S": "$input.path('$.location.city')" },
+                              "state": { "S": "$input.path('$.location.state')" },
+                              "addressLine1": { "S": "$input.path('$.location.addressLine1')" },
+                              "addressLine2": { "S": "$input.path('$.location.addressLine2')" }
+                            }
+                          }
+                        },
+                        "picture": { "S": "$input.path('$.picture')"},
+                        "type": { "S": "$input.path('$.type')"},
+                        "sex": { "S": "$input.path('$.sex')"},
+                        "status": { "S": "$input.path('$.status')"},
+                        "color": { "S": "$input.path('$.color')"},
+                        "comment": { "S": "$input.path('$.comment')"}
+                      }
+                    }
+                  },
+                  "ReturnValues": "NONE"
+                }
+              - { TableName: { Ref: TableName } }
+        responses:
+          200:
+            statusCode: 202
+            responseTemplates:
+              application/json: |
+                #set($context.responseOverride.header.Access-Control-Allow-Origin = '*')
+                #set($inputRoot = $input.path('$'))
+                {
+                  "id": "$context.requestId",
+                  "links": [
+                    {
+                      "method": "GET",
+                      "url": "https://api.gopherholesunlimited.com/jobs/gophers/$context.requestId"
+                    }
+                  ]
+                }
+    get:
+      summary: View a list of all gophers
+      description: Use this endpoint to view a list of all gophers in the system
+      tags:
+        - Gophers
+      responses:
+        200:
+          description: The request was successful and a list of gophers was returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GopherSummary'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        credentials:
+          Fn::Sub: ${GetAllGophersRole.Arn}
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:dynamodb:action/Query
+        httpMethod: POST
+        type: aws
+        passthroughBehavior: never
+        requestTemplates:
+          application/json:
+            Fn::Sub:
+              - |-
+                {
+                  "TableName": "${TableName}",
+                  "IndexName": "GSI1",
+                  "KeyConditionExpression": "#GSI1PK = :GSI1PK",
+                  "ExpressionAttributeNames": {
+                    "#GSI1PK": "GSI1PK"
+                  },
+                  "ExpressionAttributeValues": {
+                    ":GSI1PK": { "S": "gopher#" }
+                  }
+                }
+              - { TableName: { Ref: TableName } }
+        responses:
+          200:
+            statusCode: 200
+            responseTemplates:
+              application/json: |
+                #set($context.reponseOverride.header.Access-Control-Allow-Origin = '*')
+                #set($inputRoot = $input.path('$'))
+                {
+                  "items": [
+                    #foreach($elem in $inputRoot.Items) {
+                      "id": "$elem.pk.S",
+                      "name": "$elem.data.M.name.S",
+                      "location": {
+                        #if("$elem.data.M.location.M.city.S" != "")
+                        "city": "$elem.data.M.location.M.city.S",
+                        "state": "$elem.data.M.location.M.state.S"
+                        #else
+                        "latitude": "$elem.data.M.location.M.latitude.S",
+                        "longitude": "$elem.data.M.location.M.longitude.S"
+                        #end
+                      }
+                      #if("$elem.data.M.location.M.type.S" != ""),
+                      "type": "$elem.data.M.location.M.type.S"
+                      #end
+                    }
+                    #end
+                  ]
+                }
+
+  /gophers/{gopherId}/statuses:
+    parameters:
+      - $ref: '#/components/parameters/gopherId'
+    post:
+      summary: Add a new status to a specific gopher
+      description: Sets a the current status of a gopher. All status history is maintained
+      tags:
+        - Gophers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  minLength: 1
+                  description: Current status of the gopher
+                  enum: [at large, trapped, deceased, unknown]
+                  example: trapped
+      responses:
+        204:
+          $ref: '#/components/responses/NoContent'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        404:
+          $ref: '#/components/responses/NotFound'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AddGopherStatusFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+
+  /gophers/{gopherId}:
+    parameters:
+      - $ref: '#/components/parameters/gopherId'
+    put:
+      summary: Update the details of a specific gopher
+      description: If updates are necessary to the gopher, pass in the entire gopher object and replace the entity entirely
+      tags:
+        - Gophers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Gopher'
+      responses:
+        204:
+          $ref: '#/components/responses/NoContent'
+        400:
+          $ref: '#/components/responses/BadRequest'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateGopherFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+    get:
+      parameters:
+        - name: include
+          in: query
+          description: |
+            Denotes what additional information to include in the response. Currently allows: *holes*
+          required: false
+          schema:
+            type: string
+            example: holes
+
+      summary: Get the details of a specific gopher
+      description: To view additional details about a gopher, look them up by their id
+      tags:
+        - Gophers
+      responses:
+        200:
+          description: The requested gopher has been found and the details returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Gopher'
+        404:
+          $ref: '#/components/responses/NotFound'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetGopherFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+    delete:
+      summary: Delete a gopher
+      description: Deletes a gopher and all statuses from the system
+      tags:
+        - Gophers
+      responses:
+        204:
+          $ref: '#/components/responses/NoContent'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        credentials:
+          Fn::Sub: ${DeleteGopherRole.Arn}
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:dynamodb:action/DeleteItem
+        httpMethod: POST
+        type: aws
+        passthroughBehavior: 'never'
+        requestTemplates:
+          application/json:
+            Fn::Sub:
+              - |-
+                {
+                  "TableName": "${TableName}",
+                  "Key": {
+                    "pk": { "S": "$input.params('gopherId')"},
+                    "sk": { "S": "gopher#"}
+                  },
+                  "ReturnValues": "NONE"
+                }
+              - { TableName: { Ref: TableName } }
+        responses:
+          200:
+            statusCode: 204
+            responseTemplates:
+              application/json: |
+                #set($context.responseOverride.header.Access-Control-Allow-Origin = '*')
+
+  /holes:
+    post:
+      summary: Track a new hole
+      description: When you find a new gopher hole, add it into the system via this endpoint
+      tags:
+        - Holes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Hole'
+      responses:
+        201:
+          $ref: '#/components/responses/Created'
+          x-postman-variables:
+            - type: save
+              name: holdId
+              path: .id
+        400:
+          $ref: '#/components/responses/BadRequest'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        credentials:
+          Fn::Sub: ${AddHoleRole.Arn}
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:dynamodb:action/PutItem
+        httpMethod: POST
+        type: aws
+        passthroughBehavior: 'never'
+        requestTemplates:
+          application/json:
+            Fn::Sub:
+              - |-
+                #set($epochDate = $context.requestTimeEpoch / 1000 )
+                {
+                  "TableName": "${TableName}",
+                  "Item":{
+                    "pk": { "S": "$context.requestId"},
+                    "sk": { "S": "hole#"},
+                    "GSI1PK": { "S": "hole#"},
+                    "GSI1SK": { "S": "$epochDate"},
+                    #if("$input.path('$.location.latitude')" != "")
+                      "GSI2PK": { "S": "$input.path('$.location.latitude')#$input.path('$.location.longitude')" },
+                    #else
+                      "GSI2PK": { "S": "$input.path('$.location.addressLine1')#$input.path('$.location.city')#$input.path('$.location.state')" },
+                    #end
+                    "#GSI2SK": { "S": "hole#" },
+                    "data": {
+                      "M": {
+                        "location": { 
+                          "M": {
+                            #if("$input.path('$.location.latitude')" != "")
+                              "latitude": { "S": "$input.path('$.location.latitude')"},
+                              "longitude": { "S": "$input.path('$.location.longitude')"}
+                            #end
+                            #if("$input.path('$.location.city')" != "")
+                              "city": { "S": "$input.path('$.location.city')" },
+                              "state": { "S": "$input.path('$.location.state')" }
+                              #if("$input.path('$.location.addressLine1')" != ""),
+                              "addressLine1": { "S": "$input.path('$.location.addressLine1')" }
+                              #end
+                              #if("$input.path('$.location.addressLine2')" != ""),
+                              "addressLine2": { "S": "$input.path('$.location.addressLine2')" }
+                              #end
+                            #end
+                            }
+                          }
+                        },
+                        "description": { "S": "$input.path('$.description')" }
+                        #if("$input.path('$.gopherId')" != ""),
+                        "gopherId": { "S": "$input.path('$.gopherId')"}
+                        #end
+                        #if("$input.path('$.status')" != ""),
+                        "status": { "S": "$input.path('$.status')"}
+                        #else
+                        ,"status": { "S": "visible"}
+                        #end
+                        #if("$input.path('$.comment')" != ""),
+                        "comment": { "S": "$input.path('$.comment')"}
+                        #end
+                      }
+                    }
+                  },
+                  "ReturnValues": "NONE"
+                }
+              - { TableName: { Ref: TableName } }
+        responses:
+          200:
+            statusCode: 201
+            responseTemplates:
+              application/json: |
+                #set($context.responseOverride.header.Access-Control-Allow-Origin = '*')
+                #set($inputRoot = $input.path('$'))
+                {
+                  "id": "$context.requestId"
+                }
+    get:
+      summary: View a list of all holes
+      description: To view a list of all the gopher holes, use this endpoint. Returns all holes by default, but has an optional query parameter to filter by status
+      parameters:
+        - in: query
+          name: status
+          required: false
+          description: Filter holes by their current status
+          example: filled
+          schema:
+            type: string
+      tags:
+        - Holes
+      responses:
+        200:
+          description: The list of holes was returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HoleSummary'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        credentials:
+          Fn::Sub: ${GetAllHolesRole.Arn}
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:dynamodb:action/Query
+        httpMethod: POST
+        type: aws
+        passthroughBehavior: never
+        requestTemplates:
+          application/json:
+            Fn::Sub:
+              - |-
+                {
+                  "TableName": "${TableName}",
+                  "IndexName": "GSI1",
+                  "KeyConditionExpression": "#GSI1PK = :GSI1PK",
+                  "ExpressionAttributeNames": {
+                    "#GSI1PK": "GSI1PK"
+                  },
+                  "ExpressionAttributeValues": {
+                    ":GSI1PK": { "S": "hole#" }
+                  }
+                }
+              - { TableName: { Ref: TableName } }
+        responses:
+          200:
+            statusCode: 200
+            responseTemplates:
+              application/json: |
+                #set($context.reponseOverride.header.Access-Control-Allow-Origin = '*')
+                #set($inputRoot = $input.path('$'))
+                {
+                  "items": [
+                    #foreach($elem in $inputRoot.Items) {
+                      "id": "$elem.pk.S",
+                      "description": "$elem.data.M.description.S",
+                      "location": {
+                        #if("$elem.data.M.location.M.city.S" != "")
+                        "city": "$elem.data.M.location.M.city.S",
+                        "state": "$elem.data.M.location.M.state.S"
+                        #else
+                        "latitude": "$elem.data.M.location.M.latitude.S",
+                        "longitude": "$elem.data.M.location.M.longitude.S"
+                        #end
+                      }
+                      #if("$elem.data.M.location.M.gopherId.S" != ""),
+                      "type": "$elem.data.M.location.M.gopherId.S"
+                      #end
+                    }
+                    #end
+                  ]
+                }
+
+  /holes/{holeId}/statuses:
+    parameters:
+      - $ref: '#/components/parameters/holeId'
+    post:
+      summary: Update the gopher hole status
+      description: When the status of the gopher hole changes, i.e. filled, post to the this endpoint to update the hole.
+      tags:
+        - Holes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  minLength: 1
+                  enum: [filled, visible]
+                  description: New status of the gopher hole
+                  example: filled
+      responses:
+        204:
+          $ref: '#/components/responses/NoContent'
+        400:
+          $ref: '#/components/responses/BadRequest'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        credentials:
+          Fn::Sub: ${AddHoleStatusRole.Arn}
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:dynamodb:action/UpdateItem
+        httpMethod: POST
+        type: aws
+        passthroughBehavior: 'never'
+        requestTemplates:
+          application/json:
+            Fn::Sub:
+              - |-
+                #set($epochDate = $context.requestTimeEpoch / 1000 )
+                {
+                  "TableName": "${TableName}",
+                  "Key": {
+                    "pk": { "S": "$input.params('holeId')" },
+                    "sk": { "S": "hole#" }
+                  },
+                  "KeyConditionExporession": "#pk = :pk",
+                  "UpdateExpression": "#data.#status = :status",
+                  "ExpressionAttributeNames": {
+                    "#pk": "pk",
+                    "#data": "data",
+                    "#status": "status"
+                  },
+                  "ExpressionAttributeValues": {
+                    ":pk": { "S": "$input.params('holeId')" },
+                    ":status": { "S": "$input.path('$.status')" }
+                  },
+                  "ReturnValues": "NONE"
+                }
+              - { TableName: { Ref: TableName } }
+        responses:
+          200:
+            statusCode: 204
+            responseTemplates:
+              application/json: |
+                #set($context.responseOverride.header.Access-Control-Allow-Origin = '*')
+          400:
+            statusCode: 404
+            responseTemplates:
+              application/json: |
+                #set($context.responseOverride.header.Access-Control-Allow-Origin = '*')
+                {
+                  "message": "A hole with the provided id could not be found"
+                }
+
+  /holes/{holeId}:
+    parameters:
+      - $ref: '#/components/parameters/holeId'
+    put:
+      summary: Update the details of a specific hole
+      description: If updates are necessary to the hole, pass in all the details and replace the entity entirely.
+      tags:
+        - Holes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Hole'
+      responses:
+        204:
+          $ref: '#/components/responses/NoContent'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        404:
+          $ref: '#/components/responses/NotFound'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateHoleFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+    get:
+      summary: Get the details of a specific hole
+      description: To view additional details about a hole, look it up by id.
+      tags:
+        - Holes
+      responses:
+        200:
+          description: The requested hole has been found and the details returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hole'
+        404:
+          $ref: '#/components/responses/NotFound'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetHoleFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+
+components:
+  parameters:
+    gopherId:
+      name: gopherId
+      in: path
+      description: Unique identifier for a gopher
+      required: true
+      schema:
+        type: string
+        example: kfghusfdglksgu858y
+      x-postman-variables:
+        - type: load
+          name: gopherId
+    holeId:
+      name: holeId
+      in: path
+      description: Unique identifier for a hole
+      required: true
+      schema:
+        type: string
+        example: dhr558QRdvSoBkM9JcLFSK
+      x-postman-variables:
+        - type: load
+          name: holeId
+  schemas:
+    Gopher:
+      description: All information describing a gopher
+      type: object
+      required:
+        - name
+        - location
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the gopher
+          example: 8dqNfMQaR4VfHxsizLJyCx
+        name:
+          type: string
+          minLength: 1
+          description: The name of the gopher given by the hunter who submitted it
+          example: Gerry
+        type:
+          type: string
+          enum: [Western Pocket, Eastern Pocket, Geomys]
+          description: What kind of gopher is this?
+          example: Western Pocket
+        sex:
+          type: string
+          enum: [male, female, no preference, unknown]
+          description: Sex of the gopher
+          example: male
+        picture:
+          type: string
+          minLength: 1
+          description: Url of a recent photo
+          example: https://gopherhunter.s3.amazonaws.com/gerry.jpg
+        timesSeen:
+          type: number
+          description: How many times has this gopher been spotted
+          example: 42
+        status:
+          type: string
+          description: Current status of the gopher
+          enum: [at large, trapped, deceased, unknown]
+          example: at large
+        color:
+          type: string
+          description: Color of the Gopher's fur
+          example: brown
+        location:
+          $ref: '#/components/schemas/Location'
+        comment:
+          type: string
+          description: Text comment with any additional details
+          example: He keeps eating the carrots from my garden. So annoying!!
+        knownAssociates:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - name
+            properties:
+              id:
+                type: string
+                minLength: 1
+                description: Unique identifier of the gopher
+                example: 5Fe3ZQqqEcurytZdK69iew
+              name:
+                type: string
+                minLength: 1
+                description: Name of the associated gopher
+                example: Carla
+
+    Location:
+      description: Where it is located
+      oneOf:
+        - type: object
+          required:
+            - latitude
+            - longitude
+          properties:
+            latitude:
+              type: string
+              minLength: 1
+              description: Latitude location of the known whereabouts
+              example: '33.067067'
+            longitude:
+              type: string
+              minLength: 1
+              description: Longitude location of the known whereabouts
+              example: '-96.801599'
+        - type: object
+          required:
+            - city
+            - state
+          properties:
+            addressLine1:
+              type: string
+              description: Line 1 of the address of the known whereabouts
+              example: 123 Main Street
+            addressLine 2:
+              type: string
+              description: Line 2 of the address of the known whereabouts
+              example: 'Apt #2212'
+            city:
+              type: string
+              minLength: 1
+              description: City of the known whereabouts
+              example: Plano
+            state:
+              type: string
+              minLength: 1
+              description: State of the known whereabouts
+              example: TX
+      example:
+        latitude: '33.067067'
+        longitude: '-96.801599'
+
+    GopherSummary:
+      description: High level information about a gopher
+      type: array
+      items:
+        type: object
+        required:
+          - id
+          - name
+        properties:
+          id:
+            type: string
+            minLength: 1
+            description: Unique identifier of the gopher
+            example: igdLLki4no9ey1aN2rAB3s
+          name:
+            type: string
+            minLength: 1
+            description: The name of the gopher given by the hunter who submitted it
+            example: Gerry
+          type:
+            type: string
+            enum: [Western Pocket, Eastern Pocket, Geomys]
+            description: What kind of gopher is this?
+            example: Western Pocket
+          location:
+            type: object
+            description: Known location of the gopher
+            oneOf:
+              - type: object
+                required:
+                  - latitude
+                  - longitude
+                properties:
+                  latitude:
+                    type: string
+                    minLength: 1
+                    description: Latitude location of the gopher's whereabouts
+                    example: '33.067067'
+                  longitude:
+                    type: string
+                    minLength: 1
+                    description: Longitude location of the gopher's whereabouts
+                    example: '-96.801599'
+              - type: object
+                required:
+                  - city
+                  - state
+                properties:
+                  addressLine1:
+                    type: string
+                    description: Line 1 of the address of the known whereabouts
+                    example: 123 Main Street
+                  addressLine 2:
+                    type: string
+                    description: Line 2 of the address of the known whereabouts
+                    example: 'Apt #2212'
+                  city:
+                    type: string
+                    minLength: 1
+                    description: City of the known whereabouts
+                    example: Plano
+                  state:
+                    type: string
+                    minLength: 1
+                    description: State of the known whereabouts
+                    example: TX
+            example:
+              latitude: '33.067067'
+              longitude: '-96.801599'
+
+    Hole:
+      description: Full detailed information about a gopher hole
+      type: object
+      required:
+        - location
+        - description
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the hole
+          example: koktdBhckCtYTsHbvnXrqr
+        description:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Brief description about the hole
+          example: Near the fire hydrant
+        gopherId:
+          type: string
+          description: The gopher who dug the hole
+          example: igdLLki4no9ey1aN2rAB3s
+        location:
+          $ref: '#/components/schemas/Location'
+        status:
+          type: string
+          enum: [filled, visible]
+          description: Current status of the hole
+          example: filled
+        comment:
+          type: string
+          description: The hole comment
+          example: This one is huge! I stepped right in it!
+
+    HoleSummary:
+      description: High level information about a gopher hole
+      type: array
+      items:
+        type: object
+        required:
+          - id
+          - location
+          - description
+        properties:
+          id:
+            type: string
+            minLength: 1
+            description: Unique identifier for the hole
+            example: koktdBhckCtYTsHbvnXrqr
+          location:
+            type: object
+            description: Known location of the gopher
+            required:
+              - latitude
+              - longitude
+            properties:
+              latitude:
+                type: string
+                minLength: 1
+                description: Latitude location of the hole
+                example: '33.067067'
+              longitude:
+                type: string
+                minLength: 1
+                description: Longitude location of the hole
+                example: '-96.801599'
+          description:
+            type: string
+            minLength: 1
+            maxLength: 100
+            description: Brief description about the hole
+            example: Near the fire hydrant
+          gopherId:
+            type: string
+            description: Unique identifier of the gopher that dug the hole
+            example: lag91345wgli154098dghb908
+  responses:
+    Accepted:
+      description: The request was recieved and is being processed
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - id
+            properties:
+              id:
+                type: string
+                description: Unique identifier to track progress
+                example: iysgsfdgk347gnsfgG73
+              links:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - method
+                    - url
+                  properties:
+                    method:
+                      type: string
+                      description: HTTP method to use when calling the link
+                      example: GET
+                    url:
+                      type: string
+                      description: Endpoint to call
+                      example: https://api.gopherholesunlimited.com/jobs/gophers/123
+    Created:
+      description: Successfully added into the system
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - id
+            properties:
+              id:
+                type: string
+                description: The identifier for the new entity
+                example: igdLLki4no9ey1aN2rAB3s
+    BadRequest:
+      description: Unable to process request. Likely due to improperly formatted request.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - message
+            properties:
+              message:
+                type: string
+                description: Message detailing what went wrong
+                example: The 'name' field is required and is missing.
+    NotFound:
+      description: Unable to find entity with a given identifier
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - message
+            properties:
+              message:
+                type: string
+                description: Message stating the entity was not found
+                example: Unable to find entity with the provided id
+    UnknownError:
+      description: An unexpected error occurred on the server.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - message
+            properties:
+              message:
+                type: string
+                description: Unknown error message
+                example: An unexpected error occurred.
+    NoContent:
+      description: A blank response is returned indicating success

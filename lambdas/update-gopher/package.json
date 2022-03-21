@@ -1,0 +1,14 @@
+{
+  "name": "update-gopher",
+  "version": "1.0.0",
+  "description": "Update gopher details in the system",
+  "main": "app.js",
+  "author": "allenheltondev",
+  "license": "MIT",
+  "scripts": {},
+  "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.54.1",
+    "@aws-sdk/util-dynamodb": "^3.54.1",
+    "http-status-codes": "^1.4.0"
+  }
+}

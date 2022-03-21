@@ -1,0 +1,13 @@
+{
+  "name": "get-gopher",
+  "version": "1.0.0",
+  "description": "Get full details of a specific gopher",
+  "main": "index.js",
+  "author": "allenheltondev",
+  "license": "MIT",
+  "scripts": {},
+  "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.52.0",
+    "@aws-sdk/util-dynamodb": "^3.52.0"
+  }
+}
