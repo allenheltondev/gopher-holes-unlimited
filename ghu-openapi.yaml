@@ -72,6 +72,7 @@ paths:
                     "pk": { "S": "$context.requestId"},
                     "sk": { "S": "job#addGopher"},
                     "status": { "S": "Pending" },
+                    "createdDate": { "S": "$context.requestTime" },
                     "data": {
                       "M": {
                         "name": { "S": "$input.path('$.name')" },
@@ -308,6 +309,103 @@ paths:
             responseTemplates:
               application/json: |
                 #set($context.responseOverride.header.Access-Control-Allow-Origin = '*')
+
+  /jobs/gophers/{gopherId}:
+    parameters:
+      - $ref: '#/components/parameters/gopherId'
+    get:
+      summary: View the details of a job that creates a gopher
+      description: Get the status of an "Add Gopher" job
+      tags:
+        - Jobs
+      responses:
+        200:
+          description: The request was successful and the job detail was returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddGopherJobDetail'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        credentials:
+          Fn::Sub: ${GetAddGopherJobRole.Arn}
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:dynamodb:action/GetItem
+        httpMethod: POST
+        type: aws
+        passthroughBehavior: never
+        requestTemplates:
+          application/json:
+            Fn::Sub:
+              - |-
+                {
+                  "TableName": "${TableName}",
+                  "Key": {
+                    "pk": { "S": "$input.params('gopherId')" },
+                    "sk": { "S": "job#addGopher" }
+                  }
+                }
+              - { TableName: { Ref: TableName } }
+        responses:
+          200:
+            statusCode: 200
+            responseTemplates:
+              application/json: |
+                #set($context.reponseOverride.header.Access-Control-Allow-Origin = '*')
+                #set($inputRoot = $input.path('$'))
+                {
+                  #if("$inputRoot.Item" != "")
+                    "id": "$inputRoot.Item.pk.S",
+                    "status": "$inputRoot.Item.status.S",
+                    "createdDate": "$inputRoot.Item.createdDate.S",
+                    "input": {
+                      "name": "$inputRoot.Item.data.M.name.S",
+                      "location": {
+                        #if("$inputRoot.Item.data.M.location.M.latitude.S" != "")
+                          "latitude": "$inputRoot.Item.data.M.location.M.latitude.S",
+                          "longitude": "$inputRoot.Item.data.M.location.M.longitude.S"
+                        #else
+                          "city": "$inputRoot.Item.data.M.location.M.city.S",
+                          "state": "$inputRoot.Item.data.M.location.M.state.S",
+                          "addressLine1": "$inputRoot.Item.data.M.location.M.addressLine1.S"
+                          #if("$inputRoot.Item.data.M.location.M.addressLine2.S" != "")
+                            ,"addressLine2": "$inputRoot.Item.data.M.location.M.addressLine2.S"
+                          #end
+                        #end
+                      }
+                      #if("$inputRoot.Item.data.M.picture" != "")
+                        ,"picture": "$inputRoot.Item.data.M.picture.S"
+                      #end
+                      #if("$inputRoot.Item.data.M.type" != "")
+                        ,"type": "$inputRoot.Item.data.M.type.S"
+                      #end
+                      #if("$inputRoot.Item.data.M.sex" != "")
+                        ,"sex": "$inputRoot.Item.data.M.sex.S"
+                      #end
+                      #if("$inputRoot.Item.data.M.status" != "")
+                        ,"status": "$inputRoot.Item.data.M.status.S"
+                      #end
+                      #if("$inputRoot.Item.data.M.color" != "")
+                        ,"color": "$inputRoot.Item.data.M.color.S"
+                      #end
+                      #if("$inputRoot.Item.data.M.comment" != "")
+                        ,"comment": "$inputRoot.Item.data.M.comment.S"
+                      #end
+                    }
+                    #if("$inputRoot.Item.result" != "")
+                      ,"result": {
+                        "gopherId": "$inputRoot.Item.result.M.gopherId.S",
+                        "linkedHoles": "$inputRoot.Item.result.M.linkedHoles.N"
+                      }
+                    #end
+                    #if("$inputRoot.Item.error" != "")
+                      ,"error": "$inputRoot.Item.error.S"
+                    #end
+                  #else
+                    #set($context.responseOverride.status = 404)
+                    "message": "A job with the provided id could not be found"
+                  #end
+                }
 
   /holes:
     post:
@@ -791,6 +889,7 @@ components:
                 required:
                   - city
                   - state
+                  - addressLine1
                 properties:
                   addressLine1:
                     type: string
@@ -889,6 +988,50 @@ components:
             type: string
             description: Unique identifier of the gopher that dug the hole
             example: lag91345wgli154098dghb908
+
+    AddGopherJobDetail:
+      type: object
+      required:
+        - status
+        - id
+        - createdDate
+        - input
+      properties:
+        status:
+          type: string
+          enum: [Pending, In Progress, Succeeded, Failed]
+          description: Current status of the add gopher job
+          example: Pending
+        id:
+          type: string
+          description: Unique identifier of the job. Also will be the id of the gopher if the job succeeds
+          example: 823krg81234sdg34134
+        createdDate:
+          type: string
+          format: date-time
+          description: Date and time the job was created
+          example: '2022-03-22T12:10:33.932Z'
+        input:
+          $ref: '#/components/schemas/Gopher'
+        result:
+          type: object
+          required:
+            - gopherId
+            - linkedHoles
+          properties:
+            gopherId:
+              type: string
+              description: Unique identifier of the created gopher
+              example: idfg63249234hf76
+            linkedHoles:
+              type: integer
+              description: The number of existing holes that were automatically linked to the created gopher
+              example: 2
+        error:
+          type: string
+          description: Detail about the error that occurred while running the job
+          example: Something went wrong
+
   responses:
     Accepted:
       description: The request was recieved and is being processed
