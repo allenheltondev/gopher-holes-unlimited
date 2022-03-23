@@ -1,12 +1,11 @@
 ## Add Gopher State Machine
 
-State machine designed to add a gopher and notify the user when it has successfully completed
+State machine designed to add a gopher and push WebSocket notifications as data is being processed
 
 ## Input
 
 ```json
 {
-  "id": "myexampleid",
-  "userId": "myuserid"
+  "id": "myjobid"
 }
 ```
