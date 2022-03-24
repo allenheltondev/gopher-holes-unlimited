@@ -1,6 +1,6 @@
 const { DynamoDBClient, GetItemCommand, QueryCommand } = require("@aws-sdk/client-dynamodb");
 const { marshall, unmarshall } = require("@aws-sdk/util-dynamodb");
-const httpStatusCode = require('http-status-codes');
+const { StatusCodes } = require('http-status-codes');
 const ddb = new DynamoDBClient();
 
 exports.handler = async (event) => {
@@ -8,7 +8,7 @@ exports.handler = async (event) => {
     const details = await exports.getGopherDetails(event.pathParameters.gopherId);
     if (!details) {
       return {
-        statusCode: httpStatusCode.NOT_FOUND,
+        statusCode: StatusCodes.NOT_FOUND,
         body: JSON.stringify({ message: 'A gopher with the provided id could not be found.' }),
         headers: { 'Access-Control-Allow-Origin': '*' }
       };
@@ -19,7 +19,7 @@ exports.handler = async (event) => {
     }
 
     return {
-      statusCode: httpStatusCode.OK,
+      statusCode: StatusCodes.OK,
       body: JSON.stringify(details),
       headers: { 'Access-Control-Allow-Origin': '*' }
     }
@@ -27,7 +27,7 @@ exports.handler = async (event) => {
   catch (err) {
     console.error(err);
     return {
-      statusCode: httpStatusCode.INTERNAL_SERVER_ERROR,
+      statusCode: StatusCodes.INTERNAL_SERVER_ERROR,
       body: JSON.stringify({ message: 'Something went wrong' }),
       headers: { 'Access-Control-Allow-Origin': '*' }
     }
@@ -56,8 +56,16 @@ exports.mapGopherDetails = (rawData) => {
   return {
     id: rawData.pk,
     name: rawData.data.name,
-    location: rawData.data.location,
-    status: rawData.data.status,
+    location: {
+      ...rawData.data.location.city && { city: rawData.data.location.city },
+      ...rawData.data.location.state && { state: rawData.data.location.state },
+      ...rawData.data.location.addressLine1 && { addressLine1: rawData.data.location.addressLine1 },
+      ...rawData.data.location.addressLine2 && { addressLine2: rawData.data.location.addressLine2 },
+      ...rawData.data.location.latitude && { latitude: rawData.data.location.latitude },
+      ...rawData.data.location.longitude && { longitude: rawData.data.location.longitude },
+    },
+    status: rawData.data.status ?? 'unknown',
+    timesSeen: rawData.data.timesSeen ?? 0,
     ...rawData.data.picture && { picture: rawData.data.picture },
     ...rawData.data.type && { type: rawData.data.type },
     ...rawData.data.sex && { sex: rawData.data.sex },

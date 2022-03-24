@@ -26,7 +26,7 @@ exports.handler = async (event, context) => {
     }
 
     return {
-      statusCode: httpStatusCode.OK,
+      statusCode: StatusCodes.OK,
       body: JSON.stringify(hole),
       headers: { 'Access-Control-Allow-Origin': '*' }
     };
@@ -35,7 +35,7 @@ exports.handler = async (event, context) => {
   catch (err) {
     console.error(err);
     return {
-      statusCode: httpStatusCode.INTERNAL_SERVER_ERROR,
+      statusCode: StatusCodes.INTERNAL_SERVER_ERROR,
       body: JSON.stringify({ message: 'Something went wrong' }),
       headers: { 'Access-Control-Allow-Origin': '*' }
     }
@@ -64,9 +64,9 @@ exports.buildGetHoleCommand = (holeId) => {
 exports.mapHole = (dynamoDbHole) => {
   return {
     id: dynamoDbHole.pk,
-    location: dynamoDbHole.location,
-    description: dynamoDbHole.description,
-    status: dynamoDbHole.status,
+    location: dynamoDbHole.data.location,
+    description: dynamoDbHole.data.description,
+    status: dynamoDbHole.data.status ?? 'unknown', 
     addedDate: new Date(Number(dynamoDbHole.GSI1SK) * 1000).toISOString(),
     ...dynamoDbHole.comment && { comment: dynamoDbHole.comment },
     ...dynamoDbHole.gopherId && {

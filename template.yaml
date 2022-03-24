@@ -306,7 +306,7 @@ Resources:
           Statement:
             - Effect: Allow
               Action:
-                - dynamodb:PutItem
+                - dynamodb:UpdateItem
               Resource: !GetAtt GopherHolesTable.Arn  
       Environment:
         Variables:
@@ -317,7 +317,7 @@ Resources:
           Properties:
             RestApiId: !Ref GopherHolesApi
             Path: /gophers/{gopherId}
-            Method: PUT
+            Method: PATCH
 
   GetHoleFunction:
     Type: AWS::Serverless::Function

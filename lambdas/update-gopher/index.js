@@ -11,7 +11,7 @@ exports.handler = async (event) => {
     await exports.updateGopher(id, input);
 
       return {
-        statusCode: httpStatusCode.NO_CONTENT,
+        statusCode: StatusCodes.NO_CONTENT,
         headers: { 'Access-Control-Allow-Origin': '*' }
       };
   }
@@ -19,7 +19,7 @@ exports.handler = async (event) => {
     console.error(err);
     
     const response = {
-      statusCode: httpStatusCode.INTERNAL_SERVER_ERROR,      
+      statusCode: StatusCodes.INTERNAL_SERVER_ERROR,      
       headers: { 'Access-Control-Allow-Origin': '*' }
     }
     
@@ -29,7 +29,7 @@ exports.handler = async (event) => {
       message = 'A gopher with the provided id could not be found';
     }
 
-    response.body = JSON.stringify(message);
+    response.body = JSON.stringify({message});
     return response;
   }
 };

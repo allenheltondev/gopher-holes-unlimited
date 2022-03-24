@@ -221,9 +221,9 @@ paths:
   /gophers/{gopherId}:
     parameters:
       - $ref: '#/components/parameters/gopherId'
-    put:
-      summary: Update the details of a specific gopher
-      description: If updates are necessary to the gopher, pass in the entire gopher object and replace the entity entirely
+    patch:
+      summary: Update a subset of details of a specific gopher
+      description: If updates are necessary to the gopher, provide only the details that have changed
       tags:
         - Gophers
       requestBody:
@@ -231,7 +231,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Gopher'
+              $ref: '#/components/schemas/UpdateGopher'
       responses:
         204:
           $ref: '#/components/responses/NoContent'
@@ -384,6 +384,8 @@ paths:
                       #end
                       #if("$inputRoot.Item.data.M.status" != "")
                         ,"status": "$inputRoot.Item.data.M.status.S"
+                      #else
+                        ,"status": "unknown"
                       #end
                       #if("$inputRoot.Item.data.M.color" != "")
                         ,"color": "$inputRoot.Item.data.M.color.S"
@@ -454,9 +456,10 @@ paths:
                     #else
                       "GSI2PK": { "S": "$input.path('$.location.addressLine1')#$input.path('$.location.city')#$input.path('$.location.state')" },
                     #end
-                    "#GSI2SK": { "S": "hole#" },
+                    "GSI2SK": { "S": "hole#" },
                     "data": {
                       "M": {
+                        "description": { "S": "$input.path('$.description')" },
                         "location": { 
                           "M": {
                             #if("$input.path('$.location.latitude')" != "")
@@ -475,8 +478,7 @@ paths:
                             #end
                             }
                           }
-                        },
-                        "description": { "S": "$input.path('$.description')" }
+                        }                        
                         #if("$input.path('$.gopherId')" != ""),
                         "gopherId": { "S": "$input.path('$.gopherId')"}
                         #end
@@ -796,6 +798,46 @@ components:
                 minLength: 1
                 description: Name of the associated gopher
                 example: Carla
+
+    UpdateGopher:
+      description: All information describing a gopher
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: The name of the gopher given by the hunter who submitted it
+          example: Gerry
+        type:
+          type: string
+          enum: [Western Pocket, Eastern Pocket, Geomys]
+          description: What kind of gopher is this?
+          example: Western Pocket
+        sex:
+          type: string
+          enum: [male, female, no preference, unknown]
+          description: Sex of the gopher
+          example: male
+        picture:
+          type: string
+          minLength: 1
+          description: Url of a recent photo
+          example: https://gopherhunter.s3.amazonaws.com/gerry.jpg
+        status:
+          type: string
+          description: Current status of the gopher
+          enum: [at large, trapped, deceased, unknown]
+          example: at large
+        color:
+          type: string
+          description: Color of the Gopher's fur
+          example: brown
+        location:
+          $ref: '#/components/schemas/Location'
+        comment:
+          type: string
+          description: Text comment with any additional details
+          example: He keeps eating the carrots from my garden. So annoying!!
 
     Location:
       description: Where it is located

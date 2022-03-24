@@ -32,9 +32,9 @@ exports.handler = async (event) => {
       if (event?.type == 'eventbridge') {
         events.push(event.data);
       }
-      else if(event?.type = 'sns') {
+      else if (event?.type == 'sns') {
         let topicGroup = snsMessages.find(sm => sm.TopicArn == event.data.TopicArn);
-        if(!topicGroup){
+        if (!topicGroup) {
           topicGroup = {
             TopicArn: event.data.TopicArn,
             messages: []
@@ -101,7 +101,7 @@ exports.buildGopherUpdatedSnsMessage = (record) => {
         Message: JSON.stringify({
           id: record.pk,
           name: record.data.name
-        })        
+        })
       }
     }
   };
@@ -135,8 +135,10 @@ exports.startAddGopherJob = async (record) => {
 };
 
 exports.publishEvents = async (entries) => {
-  const command = exports.buildPutEventsCommand(entries);
-  await eventBridge.send(command);
+  if (entries?.length) {
+    const command = exports.buildPutEventsCommand(entries);
+    await eventBridge.send(command);
+  }
 };
 
 exports.buildPutEventsCommand = (entries) => {
@@ -145,11 +147,13 @@ exports.buildPutEventsCommand = (entries) => {
   });
 };
 
-exports.publishBatchSnsMessages = (snsMessages) => {
-  await Promise.all(snsMessages.map(async (batch) => {
-    const command = exports.buildPublishBatchSnsMessageCommand(batch);
-    await sns.send(command);
-  }));
+exports.publishBatchSnsMessages = async (snsMessages) => {
+  if (snsMessages?.length) {
+    await Promise.all(snsMessages.map(async (batch) => {
+      const command = exports.buildPublishBatchSnsMessageCommand(batch);
+      await sns.send(command);
+    }));
+  }
 };
 
 exports.buildPublishBatchSnsMessageCommand = (batch) => {

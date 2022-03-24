@@ -51,14 +51,15 @@ exports.updateGopherStatus = async (gopherId, status) => {
 exports.buildUpdateGopherStatusCommand = (gopherId, status) => {
   return new UpdateItemCommand({
     TableName: process.env.TABLE_NAME,
-    Key: {
+    Key: marshall({
       pk: gopherId,
       sk: 'gopher#'
-    },
+    }),
     ConditionExpression: 'attribute_exists(#pk)',
     UpdateExpression: 'SET #data.#status = :status',
     ExpressionAttributeNames: {
       '#pk': 'pk',
+      '#data': 'data',
       '#status': 'status'
     },
     ExpressionAttributeValues: marshall({
@@ -72,7 +73,7 @@ exports.publishGopherUpdatedMessage = async (gopherId, status) => {
   const command = exports.buildPublishGopherUpdatedCommand(gopherId, status);
 
   await sns.send(command);
-}
+};
 
 exports.buildPublishGopherUpdatedCommand = (gopherId, status) => {
   return new PublishCommand({

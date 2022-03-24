@@ -10,19 +10,19 @@ exports.handler = async (event) => {
     const id = event.pathParameters.holeId;
     await exports.updateHole(id, input);
 
-      return {
-        statusCode: httpStatusCode.NO_CONTENT,
-        headers: { 'Access-Control-Allow-Origin': '*' }
-      };
+    return {
+      statusCode: StatusCodes.NO_CONTENT,
+      headers: { 'Access-Control-Allow-Origin': '*' }
+    };
   }
   catch (err) {
     console.error(err);
-    
+
     const response = {
-      statusCode: httpStatusCode.INTERNAL_SERVER_ERROR,      
+      statusCode: StatusCodes.INTERNAL_SERVER_ERROR,
       headers: { 'Access-Control-Allow-Origin': '*' }
     }
-    
+
     let message = 'Something went wrong';
     if (err.code == 'ConditionalCheckFailedException') {
       response.statusCode = StatusCodes.NOT_FOUND;

@@ -68,7 +68,7 @@
             "S.$": "$.id"
           },
           "sk": {
-            "S": "job#"
+            "S": "job#addGopher"
           }
         },
         "UpdateExpression": "SET #status = :status",
@@ -127,7 +127,7 @@
             "S.$": "$.id"
           },
           "sk": {
-            "S": "job#"
+            "S": "job#addGopher"
           }
         },
         "UpdateExpression": "SET #status = :status, #error = :error",
@@ -358,7 +358,7 @@
             "S.$": "$.id"
           },
           "sk": {
-            "S": "job#"
+            "S": "job#addGopher"
           }
         },
         "UpdateExpression": "SET #status = :status, #result = :result",
