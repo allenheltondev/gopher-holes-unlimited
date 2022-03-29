@@ -29,6 +29,13 @@ x-amazon-apigateway-gateway-responses:
     statusCode: 400
     responseTemplates:
       application/json: '{ "message": "$context.error.validationErrorString" }'
+  INVALID_API_KEY:
+    statusCode: 401
+    responseTemplates:
+      application/json: '{ "message": "Unauthorized" }'
+
+security:
+  - api_key: []
 
 paths:
   /gophers:
@@ -706,6 +713,12 @@ paths:
         type: aws_proxy
 
 components:
+  securitySchemes:
+    api_key:
+      type: apiKey
+      name: x-api-key
+      in: header
+
   parameters:
     gopherId:
       name: gopherId

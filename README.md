@@ -6,8 +6,6 @@
 
 Welcome to the reference guide for how to build a serverless, API-first application! 
 
-
-
 ## Contents
 In this repo you will find:
 * OAS3.0 spec defining the *Gopher Holes Unlimited* API. It contains the endpoints, component schemas, and example responses
@@ -32,6 +30,20 @@ It uses [event-driven architecture](https://aws.amazon.com/event-driven-architec
 The add-gopher state machine integrates with the AWS SDK directly without the need for lambda functions. It is intended to be used as an example for long-running asynchronous jobs. To provide updates along the way, the state machine integrates with our **[AWS WebSocket microservice](https://github.com/allenheltondev/serverless-websockets)**. 
 
 The application is built with the [AWS SDK v3 in NodeJS](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/index.html). For tips and tricks for upgrading from v2 to v3, check out [my blog post](https://www.readysetcloud.io/blog/allen.helton/lessons-learned-from-switching-to-aws-sdk-v3/).
+
+## Auth
+
+This API is protected by an API key. To generate an API key, we use the [serverless-api-key-registration repository](https://www.github.com/allenheltondev/serverless-api-key-registration) stack to automatically add a registration mechanism. To generate one for yourself, you can call the following url:
+
+**POST** https://api.gopherholesunlimited.com/register/api-keys
+```json
+{
+    "name": "<youruniqueidentifier>"
+}
+```
+The name you provide must be **all lower case with no spaces, numbers, or special characters**. 
+
+This call will return an API key that you can provide in an `x-api-key` header to all calls to the Gopher Holes Unlimited API.
 
 ## Postman and API Integrations
 
