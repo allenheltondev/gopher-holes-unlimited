@@ -6,7 +6,7 @@ exports.handler = async (event, context, callback) => {
   try {
     const message = event.detail;
     if (message.isNewHoleLinked) {
-      await exports.linkNewGopherHole(message.gopherId, message.holeId, message.holeDescription);
+      await exports.linkNewGopherHole(message.gopherId, message.holeId, message.holeDescription, message.status);
     }
     else {
       await exports.deleteGopherHoleLink(message.gopherId, message.holeId);
@@ -18,12 +18,12 @@ exports.handler = async (event, context, callback) => {
   }
 };
 
-exports.linkNewGopherHole = async (gopherId, holeId) => {
-  const command = exports.buildPutItemCommand(gopherId, holeId);
+exports.linkNewGopherHole = async (gopherId, holeId, description, status) => {
+  const command = exports.buildPutItemCommand(gopherId, holeId, description, status);
   await ddb.send(command);
 };
 
-exports.buildPutItemCommand = (gopherId, holeId, description) => {
+exports.buildPutItemCommand = (gopherId, holeId, description, status) => {
   return new PutItemCommand({
     TableName: process.env.TABLE_NAME,
     Item: marshall({
@@ -31,7 +31,8 @@ exports.buildPutItemCommand = (gopherId, holeId, description) => {
       sk: `link#${gopherId}`,
       GSI1PK: gopherId,
       GSI1SK: `link#${holeId}`,
-      description: description
+      description: description,
+      ...status && { status: status }
     })
   });
 };

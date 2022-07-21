@@ -1,0 +1,13 @@
+{
+  "name": "update-gopher-hole-links",
+  "version": "1.0.0",
+  "description": "Update gopher hole links on status change",
+  "main": "app.js",
+  "author": "allenheltondev",
+  "license": "MIT",
+  "scripts": {},
+  "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.54.1",
+    "@aws-sdk/util-dynamodb": "^3.54.1"
+  }
+}

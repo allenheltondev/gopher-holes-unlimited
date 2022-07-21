@@ -61,19 +61,15 @@ exports.buildGetHoleCommand = (holeId) => {
   });
 };
 
-exports.mapHole = (dynamoDbHole) => {
+exports.mapHole = (item) => {
   return {
-    id: dynamoDbHole.pk,
-    location: dynamoDbHole.data.location,
-    description: dynamoDbHole.data.description,
-    status: dynamoDbHole.data.status ?? 'unknown', 
-    addedDate: new Date(Number(dynamoDbHole.GSI1SK) * 1000).toISOString(),
-    ...dynamoDbHole.comment && { comment: dynamoDbHole.comment },
-    ...dynamoDbHole.gopherId && {
-      gopher: {
-        id: dynamoDbHole.gopherId
-      }
-    }
+    id: item.pk,
+    location: item.data.location,
+    description: item.data.description,
+    status: item.data.status ?? 'unknown',
+    addedDate: new Date(Number(item.GSI1SK) * 1000).toISOString(),
+    ...item.data?.comment && { comment: item.data.comment },
+    ...item.data?.gopherId && { gopherId: item.data.gopherId }
   };
 };
 

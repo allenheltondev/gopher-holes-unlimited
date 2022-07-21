@@ -104,7 +104,7 @@ exports.buildQueryCommand = (gopherId) => {
 exports.mapGopherHole = (rawData) => {
   return {
     id: rawData.pk,
-    description: rawData.data.description,
-    location: rawData.data.location
+    description: rawData.description,
+    status: rawData.status
   };
 };

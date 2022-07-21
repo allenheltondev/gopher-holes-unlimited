@@ -691,6 +691,30 @@ paths:
           Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateHoleFunction.Arn}/invocations
         httpMethod: POST
         type: aws_proxy
+    patch:
+      summary: Update some of the details of a specific hole
+      description: Will update only the provided details of the whole
+      tags:
+        - Holes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HolePatch'
+      responses:
+        204:
+          $ref: '#/components/responses/NoContent'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        404:
+          $ref: '#/components/responses/NotFound'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateHoleFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
     get:
       summary: Get the details of a specific hole
       description: To view additional details about a hole, look it up by id.
@@ -979,6 +1003,32 @@ components:
           type: string
           description: Unique identifier for the hole
           example: koktdBhckCtYTsHbvnXrqr
+        description:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Brief description about the hole
+          example: Near the fire hydrant
+        gopherId:
+          type: string
+          description: The gopher who dug the hole
+          example: igdLLki4no9ey1aN2rAB3s
+        location:
+          $ref: '#/components/schemas/Location'
+        status:
+          type: string
+          enum: [filled, visible]
+          description: Current status of the hole
+          example: filled
+        comment:
+          type: string
+          description: The hole comment
+          example: This one is huge! I stepped right in it!
+
+    HolePatch:
+      description: Details of a gopher hole
+      type: object
+      properties:
         description:
           type: string
           minLength: 1

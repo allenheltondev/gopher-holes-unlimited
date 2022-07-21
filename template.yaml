@@ -17,7 +17,7 @@ Parameters:
 
 Globals:
   Function:
-    Runtime: nodejs14.x
+    Runtime: nodejs16.x
     Architectures:
       - arm64
     Tracing: Active
@@ -30,20 +30,20 @@ Globals:
         AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
   Api:
     Cors:
-      AllowMethods: "'DELETE,GET,POST,PUT'"
-      AllowHeaders: "'Content-Type'"
+      AllowMethods: "'DELETE,GET,POST,PUT,PATCH'"
+      AllowHeaders: "'Content-Type,x-api-key'"
       AllowOrigin: "'*'"
 
 Resources:
   DependencyLayer:
     Type: AWS::Serverless::LayerVersion
     Metadata:
-      BuildMethod: nodejs14.x
+      BuildMethod: nodejs16.x
     Properties:
       LayerName: gopherholes-dependency-layer
       ContentUri: layers/
       CompatibleRuntimes:
-        - nodejs14.x
+        - nodejs16.x
 
   GopherHolesApi:
     Type: AWS::Serverless::Api
@@ -352,7 +352,7 @@ Resources:
           Statement:
             - Effect: Allow
               Action:
-                - dynamodb:PutItem
+                - dynamodb:UpdateItem
               Resource: !GetAtt GopherHolesTable.Arn    
       Environment:
         Variables:
@@ -364,6 +364,12 @@ Resources:
             RestApiId: !Ref GopherHolesApi
             Path: /holes/{holeId}
             Method: PUT
+        PatchHoleEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GopherHolesApi
+            Path: /holes/{holeId}
+            Method: PATCH
 
   GopherHolesTableStream:
     Type: AWS::Serverless::Function
@@ -462,8 +468,6 @@ Resources:
   ProcessTableDeadLetterQueue:
     Type: AWS::SQS::Queue
   
-  
-  
   LinkUnlinkGopherHoleFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -498,6 +502,42 @@ Resources:
     Type: AWS::SQS::Queue
   
   LinkUnlinkGopherHoleProcessorDLQ:
+    Type: AWS::SQS::Queue
+
+  UpdateGopherHoleLinksFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/update-gopher-hole-links/
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:PutItem
+              Resource: !GetAtt GopherHolesTable.Arn  
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+      EventInvokeConfig:
+        OnFailure:
+          Type: SQS
+          Destination: !GetAtt UpdateGopherHoleLinksProcessorDLQ.Arn
+      Events:
+        StatusChanged:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail-type:
+                - Gopher Hole Status Updated
+            DeadLetterConfig:
+              Arn: !GetAtt UpdateGopherHoleLinksDeliveryDLQ.Arn
+
+  UpdateGopherHoleLinksDeliveryDLQ:
+    Type: AWS::SQS::Queue
+  
+  UpdateGopherHoleLinksProcessorDLQ:
     Type: AWS::SQS::Queue
 
   AddGopherStateMachine:

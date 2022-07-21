@@ -29,7 +29,7 @@ exports.handler = async (event) => {
       message = 'A hole with the provided id could not be found';
     }
 
-    response.body = JSON.stringify(message);
+    response.body = JSON.stringify({ message });
     return response;
   }
 };

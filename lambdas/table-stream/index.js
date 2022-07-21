@@ -2,7 +2,7 @@ const { unmarshall } = require("@aws-sdk/util-dynamodb");
 const { EventBridgeClient, PutEventsCommand } = require('@aws-sdk/client-eventbridge');
 const { SFNClient, StartExecutionCommand } = require('@aws-sdk/client-sfn');
 const { SNSClient, PublishBatchCommand } = require("@aws-sdk/client-sns");
-
+const ULID = require('ulid');
 const sfn = new SFNClient();
 const sns = new SNSClient();
 const eventBridge = new EventBridgeClient();
@@ -74,9 +74,12 @@ exports.handleModifiedRecord = (oldRecord, newRecord) => {
     else if (oldRecord.data.gopherId && !newRecord.data.gopherId) {
       return exports.buildGopherHoleLinkedEvent(oldRecord, false);
     }
+    else if (oldRecord.data.status != newRecord.data.status) {
+      return exports.buildGopherHoleStatusUpdatedEvent(newRecord);
+    }
   }
   else if (exports.isAddGopherJob(newRecord)) {
-    return exports.buildGoperUpdatedSnsMessage(newRecord);
+    return exports.buildGopherUpdatedSnsMessage(newRecord);
   }
 };
 
@@ -98,6 +101,7 @@ exports.buildGopherUpdatedSnsMessage = (record) => {
     data: {
       TopicArn: process.env.GOPHER_UPDATED_TOPIC_ARN,
       body: {
+        Id: ULID.ulid(),
         Message: JSON.stringify({
           id: record.pk,
           name: record.data.name
@@ -111,12 +115,27 @@ exports.buildGopherHoleLinkedEvent = (record, isNewLink) => {
   return {
     type: 'eventbridge',
     data: {
-      Detail: 'Gopher Hole Linked',
-      DetailType: JSON.stringify({
+      DetailType: 'Gopher Hole Linked',
+      Detail: JSON.stringify({
         gopherId: record.data.gopherId,
         holeId: record.pk,
         holeDescription: record.data.description,
-        isNewHoleLinked: isNewLink
+        isNewHoleLinked: isNewLink,
+        ...record.data.status && { status: record.data.status }
+      }),
+      Source: 'GHU'
+    }
+  };
+};
+
+exports.buildGopherHoleStatusUpdatedEvent = (record) => {
+  return {
+    type: 'eventbridge',
+    data: {
+      DetailType: 'Gopher Hole Status Updated',
+      Detail: JSON.stringify({
+        holeId: record.pk,
+        status: record.data.status
       }),
       Source: 'GHU'
     }
