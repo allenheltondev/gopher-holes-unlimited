@@ -57,7 +57,7 @@ Learning how to write in the spec not only provides the developer with a useful 
 
 [Postman](https://www.postman.com) stitches together the OAS definition with robust functionality like mock servers, web tests, and documentation right out of the box. The [blog post](https://www.readysetcloud.io/blog/allen.helton/api-first-development-with-postman/) walks you through how to set it up and start testing.
 
-To view the Open API spec (which includes direct AWS integrations), check out [ghu-openapi.yaml](./ghu-openapi.yaml)
+To view the Open API spec (which includes direct AWS integrations), check out [openapi.yaml](./openapi.yaml)
 
 ### Event-Based API with Async API Spec
 
@@ -67,7 +67,7 @@ Async API differs from Open API in that it defines `channels` instead of `endpoi
 
 With both the Async API and Open API specs, we can draw a complete picture of our serverless solution and how users may interact with it. For more details on how to write an Async API spec, refer to [this post on documenting a WebSocket API](https://www.readysetcloud.io/blog/allen.helton/intro-to-aws-websockets-part-three/).
 
-To view the Async API spec for Gopher Holes unlimited, check out [ghu-asyncapi.yaml](./ghu-asyncapi.yaml).
+To view the Async API spec for Gopher Holes unlimited, check out [asyncapi.yaml](./asyncapi.yaml).
 
 ## Like This?
 If you like this repo and the accompanying blog post, show your support by following me on [Twitter][1] or connecting with me on [LinkedIn][3]. I'm always happy to answer any questions you might have and am open to any ideas you'd like to see turned into an article on my [blog][4]!

@@ -54,7 +54,7 @@ Resources:
         Fn::Transform:
           Name: AWS::Include
           Parameters:
-            Location: ./ghu-openapi.yaml
+            Location: ./openapi.yaml
 
   AddGopherRole:
     Type: AWS::IAM::Role
@@ -242,7 +242,7 @@ Resources:
   AddGopherStatusFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: lambdas/add-gopher-status/
+      CodeUri: functions/add-gopher-status/
       Policies:
         - AWSLambdaBasicExecutionRole
         - Version: 2012-10-17
@@ -270,7 +270,7 @@ Resources:
   GetGopherFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: lambdas/get-gopher/
+      CodeUri: functions/get-gopher/
       Policies:
         - AWSLambdaBasicExecutionRole
         - Version: 2012-10-17
@@ -299,7 +299,7 @@ Resources:
   UpdateGopherFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: lambdas/update-gopher/
+      CodeUri: functions/update-gopher/
       Policies:
         - AWSLambdaBasicExecutionRole
         - Version: 2012-10-17
@@ -322,7 +322,7 @@ Resources:
   GetHoleFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: lambdas/get-hole/
+      CodeUri: functions/get-hole/
       Policies:
         - AWSLambdaBasicExecutionRole
         - Version: 2012-10-17
@@ -345,7 +345,7 @@ Resources:
   UpdateHoleFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: lambdas/update-hole/
+      CodeUri: functions/update-hole/
       Policies:
         - AWSLambdaBasicExecutionRole
         - Version: 2012-10-17
@@ -374,7 +374,7 @@ Resources:
   GopherHolesTableStream:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: lambdas/table-stream/
+      CodeUri: functions/table-stream/
       Policies:
         - AWSLambdaBasicExecutionRole
         - Version: 2012-10-17
@@ -471,7 +471,7 @@ Resources:
   LinkUnlinkGopherHoleFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: lambdas/link-unlink-gopher-hole/
+      CodeUri: functions/link-unlink-gopher-hole/
       Policies:
         - AWSLambdaBasicExecutionRole
         - Version: 2012-10-17
@@ -507,7 +507,7 @@ Resources:
   UpdateGopherHoleLinksFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: lambdas/update-gopher-hole-links/
+      CodeUri: functions/update-gopher-hole-links/
       Policies:
         - AWSLambdaBasicExecutionRole
         - Version: 2012-10-17
@@ -543,7 +543,7 @@ Resources:
   AddGopherStateMachine:
     Type: AWS::Serverless::StateMachine
     Properties:
-      DefinitionUri: state-machines/add-gopher/add-gopher.asl.json
+      DefinitionUri: workflows/add-gopher/add-gopher.asl.json
       DefinitionSubstitutions:
         DynamoDbGetItem: !Sub arn:${AWS::Partition}:states:::dynamodb:getItem
         EventBridgePutEvents: !Sub arn:${AWS::Partition}:states:::events:putEvents
