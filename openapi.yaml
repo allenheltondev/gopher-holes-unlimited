@@ -272,7 +272,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Gopher'
-        404:
+        400:
           $ref: '#/components/responses/NotFound'
       x-amazon-apigateway-request-validator: Validate All
       x-amazon-apigateway-integration:
