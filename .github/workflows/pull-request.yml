@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: 16.x     
 
-      - uses: actions/detect-breaking-changes-action@v1
+      - uses: allenheltondev/detect-breaking-changes-action@v1
         with:
           specFileName: openapi.yaml
           accessToken: ${{ secrets.GH_PAT }}
