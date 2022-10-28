@@ -22,6 +22,6 @@ jobs:
           specFileName: openapi.yaml
           accessToken: ${{ secrets.GH_PAT }}
           format: yaml
-          breakingChangeTypes:
-            - removed-paths
-            - removed-http-methods
+          breakingChangeTypes: |
+            removed-paths
+            removed-http-methods
