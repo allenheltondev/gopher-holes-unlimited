@@ -1,0 +1,27 @@
+name: Check For Breaking Changes
+on:  
+  pull_request:
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+
+jobs:
+  check-for-breaking-changes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set Node.js 16.x
+        uses: actions/setup-node@v3.5.1
+        with:
+          node-version: 16.x     
+
+      - uses: allenheltondev/detect-breaking-changes-action@v1
+        with:
+          specFileName: openapi.yaml
+          accessToken: ${{ secrets.GH_PAT }}
+          format: yaml
+          breakingChangeTypes: |
+            removed-paths
+            removed-http-methods
