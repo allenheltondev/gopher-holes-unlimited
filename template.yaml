@@ -48,13 +48,47 @@ Resources:
   GopherHolesApi:
     Type: AWS::Serverless::Api
     Properties:
-      TracingEnabled: false
+      TracingEnabled: true
       StageName: dev
+      AccessLogSetting:
+        DestinationArn: !GetAtt DirectIntegrationCloudWatchLogGroup.Arn
+        Format: "{\"request_time\": \"$context.requestTime\", \"resource_path\": \"$context.resourcePath\", \"http_method\": \"$context.httpMethod\", \"status\": \"$context.status\", \"response_length\": \"$context.responseLength\", \"response_type\": \"$context.responseType\", \"request_id\": \"$context.requestId\", \"error_message\": \"$context.error.message\", \"validation_error_string\": \"$context.error.validationErrorString\"}"
+      MethodSettings:
+        - MetricsEnabled: True
+          ResourcePath: '/*'
+          HttpMethod: '*'
+          LoggingLevel: ERROR
+          DataTraceEnabled: True
       DefinitionBody:
         Fn::Transform:
           Name: AWS::Include
           Parameters:
             Location: ./openapi.yaml
+
+  DirectIntegrationCloudWatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/vendedlogs/states/ApiGatewayAccessLogs
+      RetentionInDays: 30
+
+  DirectIntegrationCloudWatchRoleAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt DirectIntegrationCloudWatchRole.Arn
+
+  DirectIntegrationCloudWatchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          Action: sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service: apigateway.amazonaws.com
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
 
   AddGopherRole:
     Type: AWS::IAM::Role
