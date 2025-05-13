@@ -83,7 +83,7 @@ paths:
                     "data": {
                       "M": {
                         "name": { "S": "$input.path('$.name')" },
-                        "location": { 
+                        "location": {
                           "M": {
                               "latitude": { "S": "$input.path('$.location.latitude')"},
                               "longitude": { "S": "$input.path('$.location.longitude')"},
@@ -183,7 +183,7 @@ paths:
                       #if("$elem.data.M.location.M.type.S" != ""),
                       "type": "$elem.data.M.location.M.type.S"
                       #end
-                    }
+                    }#if($foreach.hasNext),#end
                     #end
                   ]
                 }
@@ -467,7 +467,7 @@ paths:
                     "data": {
                       "M": {
                         "description": { "S": "$input.path('$.description')" },
-                        "location": { 
+                        "location": {
                           "M": {
                             #if("$input.path('$.location.latitude')" != "")
                               "latitude": { "S": "$input.path('$.location.latitude')"},
@@ -485,7 +485,7 @@ paths:
                             #end
                             }
                           }
-                        }                        
+                        }
                         #if("$input.path('$.gopherId')" != ""),
                         "gopherId": { "S": "$input.path('$.gopherId')"}
                         #end
