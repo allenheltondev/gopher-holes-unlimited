@@ -1,5 +1,7 @@
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { mockClient } from 'aws-sdk-client-mock';
+import { DynamoDBDocumentClient, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 
 // Configure the environment the handler modules read at import time.
 process.env.TABLE_NAME = 'test-table';
@@ -10,6 +12,9 @@ process.env.POWERTOOLS_METRICS_NAMESPACE = 'ghu-test';
 process.env.AWS_REGION = 'us-east-1';
 
 const { handler } = await import('../src/handlers/api.js');
+
+const ddbMock = mockClient(DynamoDBDocumentClient);
+beforeEach(() => ddbMock.reset());
 
 const context = {
   awsRequestId: 'test-request',
@@ -47,4 +52,18 @@ test('POST /gophers returns 400 when the body is invalid', async () => {
 test('unknown routes resolve to 404', async () => {
   const response = await handler(proxyEvent({ method: 'GET', path: '/unicorns' }), context);
   assert.equal(response.statusCode, 404);
+});
+
+test('a conditional-check failure on a write becomes a 404', async () => {
+  // A PATCH against a missing gopher fails the attribute_exists condition; the
+  // repository raises EntityNotFoundError and the Router maps it to 404 once.
+  ddbMock.on(TransactWriteCommand).rejects(Object.assign(new Error('cancelled'), { name: 'TransactionCanceledException' }));
+
+  const response = await handler(
+    proxyEvent({ method: 'PATCH', path: '/gophers/missing', body: { name: 'Ghost' } }),
+    context
+  );
+
+  assert.equal(response.statusCode, 404);
+  assert.match(JSON.parse(response.body).message ?? '', /could not be found/i);
 });

@@ -18,8 +18,8 @@ const config = new IdempotencyConfig({
  * The wrapped function is invoked as `fn({ idempotencyKey, payload })`; only the
  * key participates in de-duplication, and the full result is replayed on repeats.
  */
-export const withIdempotency = (fn) =>
-  makeIdempotent(async ({ payload }) => fn(payload), { persistenceStore, config });
+export const withIdempotency = (writeOperation) =>
+  makeIdempotent(async ({ payload }) => writeOperation(payload), { persistenceStore, config });
 
 // Consumer-side idempotency. Domain events are delivered at-least-once, so every
 // event handler must be able to see the same `eventId` twice without doubling
@@ -33,5 +33,5 @@ const consumerConfig = new IdempotencyConfig({
   expiresAfterSeconds: 24 * 60 * 60
 });
 
-export const makeEventIdempotent = (fn) =>
-  makeIdempotent(fn, { persistenceStore, config: consumerConfig });
+export const makeEventIdempotent = (eventHandler) =>
+  makeIdempotent(eventHandler, { persistenceStore, config: consumerConfig });

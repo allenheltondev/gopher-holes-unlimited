@@ -17,6 +17,7 @@ import {
   validateHolePatch,
   validateHoleStatus
 } from '../lib/validation.js';
+import { EntityNotFoundError } from '../lib/errors.js';
 import * as gophers from '../lib/repository/gophers.js';
 import * as holes from '../lib/repository/holes.js';
 
@@ -24,6 +25,10 @@ const app = new Router({ logger });
 app.use(cors({ origin: '*', allowHeaders: ['Content-Type', 'x-api-key', 'Idempotency-Key'] }));
 app.use(metricsMiddleware(metrics));
 app.use(tracerMiddleware(tracer));
+
+// Repositories raise EntityNotFoundError when a write targets a row that isn't
+// there; map it to a 404 once here instead of guarding every write route.
+app.errorHandler(EntityNotFoundError, (error) => new NotFoundError(error.message).toWebResponse());
 
 // Idempotent variants of the create paths. See src/lib/idempotency.js.
 const createGopherIdempotent = withIdempotency(gophers.createGopher);
@@ -63,19 +68,19 @@ app.get('/gophers/:gopherId', async (reqCtx) => {
 app.patch('/gophers/:gopherId', async (reqCtx) => {
   const patch = parseBody(reqCtx.event.body);
   validateGopherPatch(patch);
-  await guardNotFound(() => gophers.updateGopher(reqCtx.params.gopherId, patch), 'gopher');
+  await gophers.updateGopher(reqCtx.params.gopherId, patch);
   return json(HttpStatusCodes.NO_CONTENT);
 });
 
 app.delete('/gophers/:gopherId', async (reqCtx) => {
-  await guardNotFound(() => gophers.deleteGopher(reqCtx.params.gopherId), 'gopher');
+  await gophers.deleteGopher(reqCtx.params.gopherId);
   return json(HttpStatusCodes.NO_CONTENT);
 });
 
 app.post('/gophers/:gopherId/statuses', async (reqCtx) => {
-  const body = parseBody(reqCtx.event.body);
-  validateGopherStatus(body);
-  await guardNotFound(() => gophers.addGopherStatus(reqCtx.params.gopherId, body.status), 'gopher');
+  const statusChange = parseBody(reqCtx.event.body);
+  validateGopherStatus(statusChange);
+  await gophers.addGopherStatus(reqCtx.params.gopherId, statusChange.status);
   return json(HttpStatusCodes.NO_CONTENT);
 });
 
@@ -104,41 +109,23 @@ app.get('/holes/:holeId', async (reqCtx) => {
 app.put('/holes/:holeId', async (reqCtx) => {
   const hole = parseBody(reqCtx.event.body);
   validateNewHole(hole);
-  await guardNotFound(() => holes.updateHole(reqCtx.params.holeId, hole, { replace: true }), 'hole');
+  await holes.updateHole(reqCtx.params.holeId, hole, { replace: true });
   return json(HttpStatusCodes.NO_CONTENT);
 });
 
 app.patch('/holes/:holeId', async (reqCtx) => {
   const patch = parseBody(reqCtx.event.body);
   validateHolePatch(patch);
-  await guardNotFound(() => holes.updateHole(reqCtx.params.holeId, patch), 'hole');
+  await holes.updateHole(reqCtx.params.holeId, patch);
   return json(HttpStatusCodes.NO_CONTENT);
 });
 
 app.post('/holes/:holeId/statuses', async (reqCtx) => {
-  const body = parseBody(reqCtx.event.body);
-  validateHoleStatus(body);
-  await guardNotFound(() => holes.updateHoleStatus(reqCtx.params.holeId, body.status), 'hole');
+  const statusChange = parseBody(reqCtx.event.body);
+  validateHoleStatus(statusChange);
+  await holes.updateHoleStatus(reqCtx.params.holeId, statusChange.status);
   return json(HttpStatusCodes.NO_CONTENT);
 });
-
-// A conditional write against a missing item surfaces as a transaction
-// cancellation; translate that into a clean 404 for the caller.
-const guardNotFound = async (operation, entity) => {
-  try {
-    return await operation();
-  } catch (err) {
-    if (isConditionalCheckFailure(err)) {
-      throw new NotFoundError(`A ${entity} with the provided id could not be found.`);
-    }
-    throw err;
-  }
-};
-
-const isConditionalCheckFailure = (err) =>
-  err?.name === 'ConditionalCheckFailedException' ||
-  err?.name === 'TransactionCanceledException' ||
-  err?.CancellationReasons?.some((reason) => reason.Code === 'ConditionalCheckFailed');
 
 export const handler = middy(async (event, context) => app.resolve(event, context)).use(
   injectLambdaContext(logger, { clearState: true })

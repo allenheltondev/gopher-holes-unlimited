@@ -31,10 +31,10 @@ const validateEnum = (value, allowed, field) => {
   }
 };
 
-export const parseBody = (raw) => {
-  if (!raw) fail('A request body is required.');
+export const parseBody = (rawBody) => {
+  if (!rawBody) fail('A request body is required.');
   try {
-    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody;
   } catch {
     fail('The request body must be valid JSON.');
   }

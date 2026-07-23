@@ -2,6 +2,8 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { monotonicFactory } from 'ulid';
 import { tracer } from './powertools.js';
+import { EVENT_SOURCE } from './events.js';
+import { EntityNotFoundError } from './errors.js';
 
 const TABLE_NAME = process.env.TABLE_NAME;
 
@@ -22,6 +24,63 @@ export const ddb = DynamoDBDocumentClient.from(client, {
 export const getItem = async (key) => {
   const { Item } = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: key }));
   return Item;
+};
+
+// Keep only the named attributes that actually have a value, so callers can
+// assemble sparse items without a conditional spread per optional field.
+export const pickDefined = (source, fields) =>
+  Object.fromEntries(fields.filter((field) => source[field] !== undefined).map((field) => [field, source[field]]));
+
+// True when a write failed because a ConditionExpression was not satisfied,
+// whether raised directly or wrapped in a cancelled transaction. Both meanings
+// ("must exist" and "must not already exist") surface as this same shape, so the
+// caller interprets it in context.
+export const isConditionalCheckFailure = (error) =>
+  error?.name === 'ConditionalCheckFailedException' ||
+  error?.name === 'TransactionCanceledException' ||
+  error?.CancellationReasons?.some((reason) => reason.Code === 'ConditionalCheckFailed');
+
+// Runs a write guarded by an `attribute_exists(pk)` condition and turns the
+// "row wasn't there" failure into a domain EntityNotFoundError, so no call site
+// has to know how DynamoDB reports a failed condition.
+export const assertFound = async (entity, id, write) => {
+  try {
+    return await write();
+  } catch (error) {
+    if (isConditionalCheckFailure(error)) throw new EntityNotFoundError(entity, id);
+    throw error;
+  }
+};
+
+// Builds a DynamoDB update from a plain description: `set` is a map of
+// attribute -> value, `remove` is a list of attribute names to drop. Returns the
+// three fields an Update operation needs, ready to spread in.
+export const buildUpdateExpression = ({ set = {}, remove = [] }) => {
+  const names = {};
+  const values = {};
+
+  const setClauses = Object.entries(set).map(([field, value]) => {
+    names[`#${field}`] = field;
+    values[`:${field}`] = value;
+    return `#${field} = :${field}`;
+  });
+  const removeClauses = remove.map((field) => {
+    names[`#${field}`] = field;
+    return `#${field}`;
+  });
+
+  const expression = [
+    setClauses.length ? `SET ${setClauses.join(', ')}` : '',
+    removeClauses.length ? `REMOVE ${removeClauses.join(', ')}` : ''
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return {
+    UpdateExpression: expression,
+    ExpressionAttributeNames: names,
+    ...(setClauses.length && { ExpressionAttributeValues: values })
+  };
 };
 
 export const query = async (params) => {
@@ -64,8 +123,8 @@ export const transactWriteWithOutbox = async ({ writes, events = [] }) => {
 };
 
 const attachTableName = (write) => {
-  const [operation, body] = Object.entries(write)[0];
-  return { [operation]: { TableName: TABLE_NAME, ...body } };
+  const [operation, operationArgs] = Object.entries(write)[0];
+  return { [operation]: { TableName: TABLE_NAME, ...operationArgs } };
 };
 
 // Outbox records live in the same single table. They are self-describing so the
@@ -85,7 +144,7 @@ export const toOutboxItem = (event) => {
     entityType: 'outbox',
     eventId,
     aggregateId: event.aggregateId,
-    source: event.source ?? 'ghu.api',
+    source: event.source ?? EVENT_SOURCE,
     detailType: event.detailType,
     detail: event.detail,
     occurredAt: new Date(now).toISOString(),

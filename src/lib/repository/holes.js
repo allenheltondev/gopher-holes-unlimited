@@ -1,13 +1,10 @@
 import { ulid } from 'ulid';
-import { getItem, query, transactWriteWithOutbox } from '../dynamo.js';
+import { assertFound, buildUpdateExpression, getItem, pickDefined, query, transactWriteWithOutbox } from '../dynamo.js';
 import { holeKey, linkKey, GSI1, GSI2, HOLE_COLLECTION, locationKey } from '../keys.js';
 import { DetailType, domainEvent } from '../events.js';
 
 const HOLE_FIELDS = ['description', 'location', 'status', 'gopherId', 'comment'];
 const OPTIONAL_FIELDS = ['gopherId', 'comment'];
-
-const pick = (source, fields) =>
-  Object.fromEntries(fields.filter((field) => source[field] !== undefined).map((field) => [field, source[field]]));
 
 export const toHole = (item) => {
   if (!item) return undefined;
@@ -16,7 +13,7 @@ export const toHole = (item) => {
     description: item.description,
     location: item.location,
     status: item.status ?? 'visible',
-    ...pick(item, ['gopherId', 'comment']),
+    ...pickDefined(item, ['gopherId', 'comment']),
     createdAt: item.createdAt,
     updatedAt: item.updatedAt
   };
@@ -29,7 +26,7 @@ export const createHole = async (input) => {
     ...holeKey(id),
     entityType: 'hole',
     id,
-    ...pick(input, HOLE_FIELDS),
+    ...pickDefined(input, HOLE_FIELDS),
     status: input.status ?? 'visible',
     createdAt: now,
     updatedAt: now,
@@ -70,77 +67,44 @@ export const listHoles = async (status) => {
   return items.map(toHole);
 };
 
-export const updateHole = async (id, input, { replace = false } = {}) => {
-  const fields = pick(input, HOLE_FIELDS);
-  const names = { '#updatedAt': 'updatedAt' };
-  const values = { ':updatedAt': new Date().toISOString() };
-  const sets = ['#updatedAt = :updatedAt'];
-  const removes = [];
-
-  for (const [key, value] of Object.entries(fields)) {
-    names[`#${key}`] = key;
-    values[`:${key}`] = value;
-    sets.push(`#${key} = :${key}`);
-  }
+export const updateHole = (id, input, { replace = false } = {}) => {
+  const changedFields = pickDefined(input, HOLE_FIELDS);
+  const set = { ...changedFields, updatedAt: new Date().toISOString() };
 
   // Keep the location index in sync whenever the physical location moves.
-  if (fields.location) {
-    names['#GSI2PK'] = 'GSI2PK';
-    values[':GSI2PK'] = locationKey(fields.location);
-    sets.push('#GSI2PK = :GSI2PK');
+  if (changedFields.location) set.GSI2PK = locationKey(changedFields.location);
+
+  // A full replace (PUT) clears the optional attributes the caller omitted.
+  const remove = replace ? OPTIONAL_FIELDS.filter((field) => changedFields[field] === undefined) : [];
+
+  const events = [domainEvent(DetailType.HoleUpdated, id, { id, changes: Object.keys(changedFields) })];
+  if (changedFields.status !== undefined) {
+    events.push(domainEvent(DetailType.HoleStatusChanged, id, { id, status: changedFields.status }));
   }
 
-  // A full replace (PUT) clears optional attributes the caller omitted.
-  if (replace) {
-    for (const field of OPTIONAL_FIELDS) {
-      if (fields[field] === undefined) {
-        names[`#${field}`] = field;
-        removes.push(`#${field}`);
-      }
-    }
-  }
-
-  const updateExpression = [`SET ${sets.join(', ')}`, removes.length ? `REMOVE ${removes.join(', ')}` : '']
-    .filter(Boolean)
-    .join(' ');
-
-  const events = [domainEvent(DetailType.HoleUpdated, id, { id, changes: Object.keys(fields) })];
-  if (fields.status !== undefined) {
-    events.push(domainEvent(DetailType.HoleStatusChanged, id, { id, status: fields.status }));
-  }
-
-  await transactWriteWithOutbox({
-    writes: [
-      {
-        Update: {
-          Key: holeKey(id),
-          ConditionExpression: 'attribute_exists(pk)',
-          UpdateExpression: updateExpression,
-          ExpressionAttributeNames: names,
-          ExpressionAttributeValues: values
-        }
-      }
-    ],
-    events
-  });
+  return assertFound('hole', id, () =>
+    transactWriteWithOutbox({
+      writes: [{ Update: { Key: holeKey(id), ConditionExpression: 'attribute_exists(pk)', ...buildUpdateExpression({ set, remove }) } }],
+      events
+    })
+  );
 };
 
-export const updateHoleStatus = async (id, status) => {
-  await transactWriteWithOutbox({
-    writes: [
-      {
-        Update: {
-          Key: holeKey(id),
-          ConditionExpression: 'attribute_exists(pk)',
-          UpdateExpression: 'SET #status = :status, #updatedAt = :now',
-          ExpressionAttributeNames: { '#status': 'status', '#updatedAt': 'updatedAt' },
-          ExpressionAttributeValues: { ':status': status, ':now': new Date().toISOString() }
+export const updateHoleStatus = (id, status) =>
+  assertFound('hole', id, () =>
+    transactWriteWithOutbox({
+      writes: [
+        {
+          Update: {
+            Key: holeKey(id),
+            ConditionExpression: 'attribute_exists(pk)',
+            ...buildUpdateExpression({ set: { status, updatedAt: new Date().toISOString() } })
+          }
         }
-      }
-    ],
-    events: [domainEvent(DetailType.HoleStatusChanged, id, { id, status })]
-  });
-};
+      ],
+      events: [domainEvent(DetailType.HoleStatusChanged, id, { id, status })]
+    })
+  );
 
 // ---- Linking (used by the choreography consumer, not the API directly) ----
 
@@ -196,16 +160,7 @@ export const syncLinkStatus = async (holeId, status) => {
   await Promise.all(
     links.map((link) =>
       transactWriteWithOutbox({
-        writes: [
-          {
-            Update: {
-              Key: linkKey(link.gopherId, holeId),
-              UpdateExpression: 'SET #status = :status',
-              ExpressionAttributeNames: { '#status': 'status' },
-              ExpressionAttributeValues: { ':status': status }
-            }
-          }
-        ]
+        writes: [{ Update: { Key: linkKey(link.gopherId, holeId), ...buildUpdateExpression({ set: { status } }) } }]
       })
     )
   );

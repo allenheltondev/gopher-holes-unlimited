@@ -3,6 +3,7 @@ import { injectLambdaContext } from '@aws-lambda-powertools/logger/middleware';
 import { MetricUnit } from '@aws-lambda-powertools/metrics';
 import { logger, metrics } from '../lib/powertools.js';
 import { makeEventIdempotent } from '../lib/idempotency.js';
+import { isConditionalCheckFailure } from '../lib/dynamo.js';
 import { DetailType } from '../lib/events.js';
 import { findHolesAtLocation, linkGopherToHole, syncLinkStatus } from '../lib/repository/holes.js';
 
@@ -16,34 +17,36 @@ import { findHolesAtLocation, linkGopherToHole, syncLinkStatus } from '../lib/re
 // written with a `attribute_not_exists` condition, replays are naturally
 // idempotent: re-processing an event simply no-ops on the already-linked pairs.
 
-const alreadyLinked = (err) =>
-  err?.name === 'TransactionCanceledException' ||
-  err?.name === 'ConditionalCheckFailedException' ||
-  err?.CancellationReasons?.some((reason) => reason.Code === 'ConditionalCheckFailed');
+// Links are written with an `attribute_not_exists` condition, so a re-processed
+// event just fails that condition on the pairs already linked. Swallow only that
+// case; anything else is a real error and should fail so the event is retried.
+const linkIfNotAlready = async (link) => {
+  try {
+    await linkGopherToHole(link);
+    return true;
+  } catch (error) {
+    if (isConditionalCheckFailure(error)) return false;
+    throw error;
+  }
+};
 
 const onGopherCreated = async ({ id, location }) => {
   const nearbyHoles = await findHolesAtLocation(location);
-  let linked = 0;
-  for (const hole of nearbyHoles) {
-    try {
-      await linkGopherToHole({ gopherId: id, holeId: hole.id, description: hole.description, status: hole.status });
-      linked += 1;
-    } catch (err) {
-      if (!alreadyLinked(err)) throw err;
-    }
-  }
+  const results = await Promise.all(
+    nearbyHoles.map((hole) =>
+      linkIfNotAlready({ gopherId: id, holeId: hole.id, description: hole.description, status: hole.status })
+    )
+  );
+
+  const linked = results.filter(Boolean).length;
   logger.info('Linked gopher to holes at its location', { gopherId: id, linked });
   metrics.addMetric('HolesLinkedToGopher', MetricUnit.Count, linked);
 };
 
 const onHoleCreated = async ({ id, gopherId, description, status }) => {
   if (!gopherId) return;
-  try {
-    await linkGopherToHole({ gopherId, holeId: id, description, status });
-    metrics.addMetric('HolesLinkedToGopher', MetricUnit.Count, 1);
-  } catch (err) {
-    if (!alreadyLinked(err)) throw err;
-  }
+  const linked = await linkIfNotAlready({ gopherId, holeId: id, description, status });
+  if (linked) metrics.addMetric('HolesLinkedToGopher', MetricUnit.Count, 1);
 };
 
 const onHoleStatusChanged = async ({ id, status }) => {

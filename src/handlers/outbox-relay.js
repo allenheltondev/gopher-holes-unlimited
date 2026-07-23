@@ -76,18 +76,15 @@ export const publishRecord = async (record) => {
 const lambdaHandler = async (event) => {
   const records = event.Records ?? [];
 
-  for (let i = 0; i < records.length; i++) {
+  for (const record of records) {
     try {
-      await publishRecord(records[i]);
-    } catch (err) {
+      await publishRecord(record);
+    } catch (error) {
       // Ordered source: report the first failed sequence number and stop.
       // DynamoDB Streams re-delivers this record and everything after it, so we
       // must not publish any later record in this batch.
-      const sequenceNumber = records[i].dynamodb?.SequenceNumber;
-      logger.error('Failed to publish outbox record; halting batch to preserve order', {
-        error: err,
-        sequenceNumber
-      });
+      const sequenceNumber = record.dynamodb?.SequenceNumber;
+      logger.error('Failed to publish outbox record; halting batch to preserve order', { error, sequenceNumber });
       metrics.addMetric('DomainEventPublishFailed', MetricUnit.Count, 1);
       return { batchItemFailures: [{ itemIdentifier: sequenceNumber }] };
     }

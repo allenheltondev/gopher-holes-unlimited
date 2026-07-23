@@ -1,14 +1,11 @@
 import { ulid } from 'ulid';
-import { getItem, query, transactWriteWithOutbox } from '../dynamo.js';
+import { assertFound, buildUpdateExpression, getItem, pickDefined, query, transactWriteWithOutbox } from '../dynamo.js';
 import { gopherKey, gopherStatusKey, GSI1, GOPHER_COLLECTION, LINK_PREFIX } from '../keys.js';
 import { DetailType, domainEvent } from '../events.js';
 
 // Attributes a caller is allowed to set on a gopher. Anything else in the
 // request body is ignored, which keeps the write path safe from unexpected input.
 const GOPHER_FIELDS = ['name', 'type', 'sex', 'picture', 'status', 'color', 'location', 'comment'];
-
-const pick = (source, fields) =>
-  Object.fromEntries(fields.filter((field) => source[field] !== undefined).map((field) => [field, source[field]]));
 
 export const toGopher = (item) => {
   if (!item) return undefined;
@@ -18,7 +15,7 @@ export const toGopher = (item) => {
     location: item.location,
     status: item.status ?? 'unknown',
     timesSeen: item.timesSeen ?? 0,
-    ...pick(item, ['type', 'sex', 'picture', 'color', 'comment']),
+    ...pickDefined(item, ['type', 'sex', 'picture', 'color', 'comment']),
     createdAt: item.createdAt,
     updatedAt: item.updatedAt
   };
@@ -32,7 +29,7 @@ export const createGopher = async (input) => {
     entityType: 'gopher',
     id,
     timesSeen: 0,
-    ...pick(input, GOPHER_FIELDS),
+    ...pickDefined(input, GOPHER_FIELDS),
     status: input.status ?? 'unknown',
     createdAt: now,
     updatedAt: now,
@@ -59,85 +56,64 @@ export const listGophers = async () => {
   return items.map(toGopher);
 };
 
-export const updateGopher = async (id, patch) => {
-  const fields = pick(patch, GOPHER_FIELDS);
-  const { updateExpression, names, values } = buildUpdate(fields);
+export const updateGopher = (id, patch) => {
+  const changedFields = pickDefined(patch, GOPHER_FIELDS);
 
-  await transactWriteWithOutbox({
-    writes: [
-      {
-        Update: {
-          Key: gopherKey(id),
-          ConditionExpression: 'attribute_exists(pk)',
-          UpdateExpression: updateExpression,
-          ExpressionAttributeNames: names,
-          ExpressionAttributeValues: values
+  return assertFound('gopher', id, () =>
+    transactWriteWithOutbox({
+      writes: [
+        {
+          Update: {
+            Key: gopherKey(id),
+            ConditionExpression: 'attribute_exists(pk)',
+            ...buildUpdateExpression({ set: { ...changedFields, updatedAt: new Date().toISOString() } })
+          }
         }
-      }
-    ],
-    events: [domainEvent(DetailType.GopherUpdated, id, { id, changes: Object.keys(fields) })]
-  });
+      ],
+      events: [domainEvent(DetailType.GopherUpdated, id, { id, changes: Object.keys(changedFields) })]
+    })
+  );
 };
 
-export const deleteGopher = async (id) => {
-  await transactWriteWithOutbox({
-    writes: [{ Delete: { Key: gopherKey(id), ConditionExpression: 'attribute_exists(pk)' } }],
-    events: [domainEvent(DetailType.GopherDeleted, id, { id })]
-  });
-};
+export const deleteGopher = (id) =>
+  assertFound('gopher', id, () =>
+    transactWriteWithOutbox({
+      writes: [{ Delete: { Key: gopherKey(id), ConditionExpression: 'attribute_exists(pk)' } }],
+      events: [domainEvent(DetailType.GopherDeleted, id, { id })]
+    })
+  );
 
-export const addGopherStatus = async (id, status) => {
+export const addGopherStatus = (id, status) => {
   const statusId = ulid();
   const now = new Date().toISOString();
 
-  await transactWriteWithOutbox({
-    writes: [
-      {
-        Update: {
-          Key: gopherKey(id),
-          ConditionExpression: 'attribute_exists(pk)',
-          UpdateExpression: 'SET #status = :status, #updatedAt = :now',
-          ExpressionAttributeNames: { '#status': 'status', '#updatedAt': 'updatedAt' },
-          ExpressionAttributeValues: { ':status': status, ':now': now }
-        }
-      },
-      {
-        Put: {
-          Item: {
-            ...gopherStatusKey(id, statusId),
-            entityType: 'gopherStatus',
-            gopherId: id,
-            status,
-            createdAt: now
+  return assertFound('gopher', id, () =>
+    transactWriteWithOutbox({
+      writes: [
+        {
+          Update: {
+            Key: gopherKey(id),
+            ConditionExpression: 'attribute_exists(pk)',
+            ...buildUpdateExpression({ set: { status, updatedAt: now } })
+          }
+        },
+        {
+          Put: {
+            Item: { ...gopherStatusKey(id, statusId), entityType: 'gopherStatus', gopherId: id, status, createdAt: now }
           }
         }
-      }
-    ],
-    events: [domainEvent(DetailType.GopherStatusChanged, id, { id, status })]
-  });
+      ],
+      events: [domainEvent(DetailType.GopherStatusChanged, id, { id, status })]
+    })
+  );
 };
 
 // A gopher's linked holes are stored under its own partition, so this is a
 // simple begins_with query with no index needed.
 export const getGopherHoles = async (id) => {
-  const items = await query({
+  const links = await query({
     KeyConditionExpression: 'pk = :pk AND begins_with(sk, :link)',
     ExpressionAttributeValues: { ':pk': gopherKey(id).pk, ':link': LINK_PREFIX }
   });
-  return items.map((item) => ({ id: item.holeId, description: item.description, status: item.status }));
-};
-
-// Shared by both the API (PATCH) and keeps the SET expression building in one place.
-export const buildUpdate = (fields) => {
-  const names = { '#updatedAt': 'updatedAt' };
-  const values = { ':updatedAt': new Date().toISOString() };
-  const assignments = ['#updatedAt = :updatedAt'];
-
-  for (const [key, value] of Object.entries(fields)) {
-    names[`#${key}`] = key;
-    values[`:${key}`] = value;
-    assignments.push(`#${key} = :${key}`);
-  }
-
-  return { updateExpression: `SET ${assignments.join(', ')}`, names, values };
+  return links.map((link) => ({ id: link.holeId, description: link.description, status: link.status }));
 };
