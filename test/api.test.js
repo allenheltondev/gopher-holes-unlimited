@@ -56,8 +56,14 @@ test('unknown routes resolve to 404', async () => {
 
 test('a conditional-check failure on a write becomes a 404', async () => {
   // A PATCH against a missing gopher fails the attribute_exists condition; the
-  // repository raises EntityNotFoundError and the Router maps it to 404 once.
-  ddbMock.on(TransactWriteCommand).rejects(Object.assign(new Error('cancelled'), { name: 'TransactionCanceledException' }));
+  // transaction is cancelled with reason ConditionalCheckFailed, the repository
+  // raises EntityNotFoundError, and the Router maps it to 404 once.
+  ddbMock.on(TransactWriteCommand).rejects(
+    Object.assign(new Error('cancelled'), {
+      name: 'TransactionCanceledException',
+      CancellationReasons: [{ Code: 'ConditionalCheckFailed' }]
+    })
+  );
 
   const response = await handler(
     proxyEvent({ method: 'PATCH', path: '/gophers/missing', body: { name: 'Ghost' } }),

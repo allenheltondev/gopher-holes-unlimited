@@ -114,6 +114,21 @@ recognized and skipped. Its reactions are independently idempotent too (links us
 `attribute_not_exists` conditions; status sync is set-to-value), giving defense in
 depth.
 
+Two ordering/consistency hazards are handled explicitly, since the stream is
+at-least-once and EventBridge delivery is only best-effort ordered:
+
+- **Out-of-order status events.** `hole.status-changed` handling ignores the
+  status in the event payload and instead re-reads the hole (strongly consistent)
+  and propagates *that* onto the links. The hole item is the single source of
+  truth for its latest status, so an older event arriving after a newer one still
+  converges the links correctly.
+- **Eventually-consistent GSI reads.** Location auto-linking is symmetric —
+  `gopher.created` links holes at its location *and* `hole.created` links gophers
+  at its location (gophers are indexed in GSI2 too). Whichever entity's GSI write
+  has propagated first heals the other's read, so a link can't be lost just
+  because a secondary-index write hadn't caught up. Duplicate attempts from the
+  two directions no-op via the `attribute_not_exists` condition.
+
 Retrying a partially-failed reaction is the **invocation's** job, not a loop
 inside the handler. When a gopher is linked to the holes at its location, the
 consumer writes them with `Promise.allSettled` (so every write finishes before the
@@ -171,7 +186,7 @@ asyncapi.yaml         # Domain event documentation
 
 | Entity          | pk                | sk                  | Indexes                                            |
 |-----------------|-------------------|---------------------|----------------------------------------------------|
-| Gopher          | `GOPHER#<id>`     | `GOPHER#<id>`       | GSI1: `GOPHER` / `<createdAt>`                      |
+| Gopher          | `GOPHER#<id>`     | `GOPHER#<id>`       | GSI1: `GOPHER` / `<createdAt>`, GSI2: `LOCATION#…` / `GOPHER#<id>` |
 | Gopher status   | `GOPHER#<id>`     | `STATUS#<ulid>`     | –                                                  |
 | Hole            | `HOLE#<id>`       | `HOLE#<id>`         | GSI1: `HOLE` / `<createdAt>`, GSI2: `LOCATION#…`    |
 | Gopher⇄Hole link| `GOPHER#<gopher>` | `LINK#HOLE#<hole>`  | GSI1: `HOLE#<hole>` / `GOPHER#<gopher>` (reverse)   |

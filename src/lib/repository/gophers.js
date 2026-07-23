@@ -1,6 +1,6 @@
 import { ulid } from 'ulid';
 import { assertFound, buildUpdateExpression, getItem, pickDefined, query, transactWriteWithOutbox } from '../dynamo.js';
-import { gopherKey, gopherStatusKey, GSI1, GOPHER_COLLECTION, LINK_PREFIX } from '../keys.js';
+import { gopherKey, gopherStatusKey, GSI1, GSI2, GOPHER_COLLECTION, LINK_PREFIX, locationKey } from '../keys.js';
 import { DetailType, domainEvent } from '../events.js';
 
 // Attributes a caller is allowed to set on a gopher. Anything else in the
@@ -34,7 +34,11 @@ export const createGopher = async (input) => {
     createdAt: now,
     updatedAt: now,
     GSI1PK: GOPHER_COLLECTION,
-    GSI1SK: now
+    GSI1SK: now,
+    // Index the gopher by location (GSI2) so a hole reported at the same spot can
+    // find it — the symmetric half of gopher.created finding holes by location.
+    GSI2PK: locationKey(input.location),
+    GSI2SK: `GOPHER#${id}`
   };
 
   await transactWriteWithOutbox({
@@ -58,6 +62,9 @@ export const listGophers = async () => {
 
 export const updateGopher = (id, patch) => {
   const changedFields = pickDefined(patch, GOPHER_FIELDS);
+  const set = { ...changedFields, updatedAt: new Date().toISOString() };
+  // Keep the location index in sync whenever the gopher moves.
+  if (changedFields.location) set.GSI2PK = locationKey(changedFields.location);
 
   return assertFound('gopher', id, () =>
     transactWriteWithOutbox({
@@ -66,7 +73,7 @@ export const updateGopher = (id, patch) => {
           Update: {
             Key: gopherKey(id),
             ConditionExpression: 'attribute_exists(pk)',
-            ...buildUpdateExpression({ set: { ...changedFields, updatedAt: new Date().toISOString() } })
+            ...buildUpdateExpression({ set })
           }
         }
       ],
@@ -116,4 +123,17 @@ export const getGopherHoles = async (id) => {
     ExpressionAttributeValues: { ':pk': gopherKey(id).pk, ':link': LINK_PREFIX }
   });
   return links.map((link) => ({ id: link.holeId, description: link.description, status: link.status }));
+};
+
+// Gophers seen at a physical location (GSI2). Used by the choreography consumer
+// so a newly reported hole can link the gophers already known at its spot.
+export const findGophersAtLocation = async (location) => {
+  const locationPk = locationKey(location);
+  if (!locationPk) return [];
+  const items = await query({
+    IndexName: GSI2,
+    KeyConditionExpression: 'GSI2PK = :location AND begins_with(GSI2SK, :prefix)',
+    ExpressionAttributeValues: { ':location': locationPk, ':prefix': 'GOPHER#' }
+  });
+  return items.map(toGopher);
 };

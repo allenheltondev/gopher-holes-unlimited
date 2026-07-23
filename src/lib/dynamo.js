@@ -21,8 +21,8 @@ export const ddb = DynamoDBDocumentClient.from(client, {
   marshallOptions: { removeUndefinedValues: true }
 });
 
-export const getItem = async (key) => {
-  const { Item } = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: key }));
+export const getItem = async (key, { consistentRead = false } = {}) => {
+  const { Item } = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: key, ConsistentRead: consistentRead }));
   return Item;
 };
 
@@ -31,14 +31,17 @@ export const getItem = async (key) => {
 export const pickDefined = (source, fields) =>
   Object.fromEntries(fields.filter((field) => source[field] !== undefined).map((field) => [field, source[field]]));
 
-// True when a write failed because a ConditionExpression was not satisfied,
-// whether raised directly or wrapped in a cancelled transaction. Both meanings
-// ("must exist" and "must not already exist") surface as this same shape, so the
-// caller interprets it in context.
+// True only when a write failed because a ConditionExpression was not satisfied.
+// A TransactWriteCommand can also be cancelled for transient reasons
+// (TransactionConflict, throttling, capacity) that surface as the same
+// TransactionCanceledException, so we must inspect the cancellation reasons
+// rather than trust the exception name — otherwise a transient failure would be
+// misread as "already linked" / "not found" and its write silently lost. Both
+// conditional meanings ("must exist" and "must not already exist") report the
+// reason code ConditionalCheckFailed, so the caller interprets it in context.
 export const isConditionalCheckFailure = (error) =>
   error?.name === 'ConditionalCheckFailedException' ||
-  error?.name === 'TransactionCanceledException' ||
-  error?.CancellationReasons?.some((reason) => reason.Code === 'ConditionalCheckFailed');
+  !!error?.CancellationReasons?.some((reason) => reason.Code === 'ConditionalCheckFailed');
 
 // Runs a write guarded by an `attribute_exists(pk)` condition and turns the
 // "row wasn't there" failure into a domain EntityNotFoundError, so no call site

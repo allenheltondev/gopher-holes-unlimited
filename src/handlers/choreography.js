@@ -5,7 +5,8 @@ import { logger, metrics } from '../lib/powertools.js';
 import { makeEventIdempotent } from '../lib/idempotency.js';
 import { isConditionalCheckFailure } from '../lib/dynamo.js';
 import { DetailType } from '../lib/events.js';
-import { findHolesAtLocation, linkGopherToHole, syncLinkStatus } from '../lib/repository/holes.js';
+import { findHolesAtLocation, getHole, linkGopherToHole, syncLinkStatus } from '../lib/repository/holes.js';
+import { findGophersAtLocation } from '../lib/repository/gophers.js';
 
 // Choreography consumer: reacts to domain events on the event bus to carry out
 // cross-aggregate side effects. This is where the old Step Function's
@@ -25,46 +26,61 @@ const linkIfNotAlready = async (link) => {
     await linkGopherToHole(link);
     return true;
   } catch (error) {
+    // Only a genuine condition failure means "already linked". A transient
+    // transaction conflict/throttle must propagate so the event is retried,
+    // otherwise the link (and its outbox event) would be silently lost.
     if (isConditionalCheckFailure(error)) return false;
     throw error;
   }
 };
 
-export const onGopherCreated = async ({ id, location }) => {
-  const nearbyHoles = await findHolesAtLocation(location);
-
-  // allSettled, not Promise.all: we want every link write to finish before this
-  // handler returns. A fail-fast reject would let Lambda freeze the environment
-  // with sibling writes still in flight. Already-linked pairs resolve to false.
-  const outcomes = await Promise.allSettled(
-    nearbyHoles.map((hole) =>
-      linkIfNotAlready({ gopherId: id, holeId: hole.id, description: hole.description, status: hole.status })
-    )
-  );
-
+// Write a set of gopher/hole links concurrently. allSettled (not Promise.all) so
+// every write finishes before we return — a fail-fast reject would let Lambda
+// freeze the environment with sibling writes still in flight. Any genuine failure
+// is re-thrown so the whole (idempotent) event is redelivered; links already
+// written simply no-op next time. Retry belongs at the invocation boundary, not
+// in a loop here that could burn Lambda duration and hit the timeout.
+const linkAll = async (links) => {
+  const outcomes = await Promise.allSettled(links.map(linkIfNotAlready));
   const linked = outcomes.filter((outcome) => outcome.status === 'fulfilled' && outcome.value).length;
   const failures = outcomes.filter((outcome) => outcome.status === 'rejected').map((outcome) => outcome.reason);
-  metrics.addMetric('HolesLinkedToGopher', MetricUnit.Count, linked);
-  logger.info('Linked gopher to holes at its location', { gopherId: id, linked, failed: failures.length });
-
-  // Retrying failures is the invocation's job, not a loop in here: throwing fails
-  // the event so EventBridge/Lambda re-delivers it, and the links already written
-  // simply no-op on the next pass (they are idempotent). This avoids burning
-  // Lambda duration on an in-handler retry loop that could hit the timeout.
+  metrics.addMetric('GopherHoleLinksCreated', MetricUnit.Count, linked);
   if (failures.length) {
-    throw new AggregateError(failures, `Failed to link ${failures.length} of ${nearbyHoles.length} hole(s)`);
+    throw new AggregateError(failures, `Failed to write ${failures.length} of ${links.length} link(s)`);
   }
+  return linked;
 };
 
-const onHoleCreated = async ({ id, gopherId, description, status }) => {
-  if (!gopherId) return;
-  const linked = await linkIfNotAlready({ gopherId, holeId: id, description, status });
-  if (linked) metrics.addMetric('HolesLinkedToGopher', MetricUnit.Count, 1);
+export const onGopherCreated = async ({ id, location }) => {
+  const holesHere = await findHolesAtLocation(location);
+  const linked = await linkAll(
+    holesHere.map((hole) => ({ gopherId: id, holeId: hole.id, description: hole.description, status: hole.status }))
+  );
+  logger.info('Linked gopher to holes at its location', { gopherId: id, linked });
 };
 
-const onHoleStatusChanged = async ({ id, status }) => {
-  const updated = await syncLinkStatus(id, status);
-  logger.info('Propagated hole status to links', { holeId: id, status, updated });
+export const onHoleCreated = async ({ id, gopherId, description, status, location }) => {
+  // Symmetric to onGopherCreated: link the digger (when named) plus every gopher
+  // already seen at this location. Doing both directions means whichever entity
+  // was indexed first heals the other's eventually-consistent GSI2 read, so a
+  // link can't be lost just because a GSI write hadn't propagated yet.
+  const gopherIds = new Set((await findGophersAtLocation(location)).map((gopher) => gopher.id));
+  if (gopherId) gopherIds.add(gopherId);
+  const linked = await linkAll(
+    [...gopherIds].map((linkedGopherId) => ({ gopherId: linkedGopherId, holeId: id, description, status }))
+  );
+  logger.info('Linked hole to gophers at its location', { holeId: id, linked });
+};
+
+export const onHoleStatusChanged = async ({ id }) => {
+  // Re-read the hole (strongly consistent) and propagate its CURRENT status.
+  // hole.status-changed events can arrive out of order (EventBridge delivery is
+  // best-effort ordered), but the hole item is the single source of truth for its
+  // latest status, so syncing links to it converges regardless of event order.
+  const hole = await getHole(id, { consistentRead: true });
+  if (!hole) return;
+  const updated = await syncLinkStatus(id, hole.status);
+  logger.info('Propagated hole status to links', { holeId: id, status: hole.status, updated });
 };
 
 const routes = {

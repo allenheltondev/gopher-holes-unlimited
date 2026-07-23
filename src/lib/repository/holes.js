@@ -109,14 +109,15 @@ export const updateHoleStatus = (id, status) =>
 // ---- Linking (used by the choreography consumer, not the API directly) ----
 
 // Find holes that share a physical location with a gopher, so a newly reported
-// gopher can be auto-linked to the holes already known at that spot.
+// gopher can be auto-linked to the holes already known at that spot. GSI2 also
+// holds gophers keyed by location, so the sort-key prefix restricts this to holes.
 export const findHolesAtLocation = async (location) => {
-  const pk = locationKey(location);
-  if (!pk) return [];
+  const locationPk = locationKey(location);
+  if (!locationPk) return [];
   const items = await query({
     IndexName: GSI2,
-    KeyConditionExpression: 'GSI2PK = :pk',
-    ExpressionAttributeValues: { ':pk': pk }
+    KeyConditionExpression: 'GSI2PK = :location AND begins_with(GSI2SK, :prefix)',
+    ExpressionAttributeValues: { ':location': locationPk, ':prefix': 'HOLE#' }
   });
   return items.map(toHole);
 };
