@@ -119,19 +119,14 @@ Resources:
     Properties:
       StageName: dev
       TracingEnabled: true
-      AccessLogSetting:
-        DestinationArn: !GetAtt ApiAccessLogGroup.Arn
-        Format: '{"requestTime":"$context.requestTime","requestId":"$context.requestId","httpMethod":"$context.httpMethod","path":"$context.path","status":"$context.status","responseLatency":"$context.responseLatency","integrationError":"$context.integration.error"}'
+      # No API Gateway access/execution logging: both require an account-level
+      # CloudWatch Logs role that this stack does not manage, and observability
+      # is already covered by Powertools (structured Lambda logs, EMF metrics)
+      # and X-Ray. CloudWatch *metrics* need no such role, so we keep those.
       MethodSettings:
         - MetricsEnabled: true
           ResourcePath: '/*'
           HttpMethod: '*'
-          LoggingLevel: ERROR
-
-  ApiAccessLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      RetentionInDays: 30
 
   ApiFunction:
     Type: AWS::Serverless::Function
