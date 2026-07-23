@@ -32,11 +32,10 @@ Globals:
         POWERTOOLS_METRICS_NAMESPACE: !Ref MetricsNamespace
         POWERTOOLS_LOG_LEVEL: !Ref LogLevel
         POWERTOOLS_LOGGER_LOG_EVENT: 'false'
-  Api:
-    Cors:
-      AllowMethods: "'DELETE,GET,POST,PUT,PATCH,OPTIONS'"
-      AllowHeaders: "'Content-Type,x-api-key,Idempotency-Key'"
-      AllowOrigin: "'*'"
+  # CORS (including OPTIONS preflight) is handled inside the mono-Lambda by the
+  # Powertools `cors()` middleware, so no API Gateway-level CORS is configured
+  # here. SAM's `Api.Cors` would require an inline OpenAPI DefinitionBody anyway,
+  # which this proxy-integration API intentionally does not use.
 
 Resources:
   # ---------------------------------------------------------------------------
