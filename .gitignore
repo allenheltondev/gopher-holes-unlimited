@@ -373,3 +373,9 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.gitignore.io/api/osx,node,linux,python,pycharm,windows,visualstudiocode
+
+# --- Gopher Holes Unlimited ---
+# This is a Node.js project. The Python-oriented `lib/` rule above must not
+# swallow our application source under src/lib.
+!src/lib/
+!src/lib/**
