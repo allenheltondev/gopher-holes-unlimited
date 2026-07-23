@@ -256,6 +256,17 @@ Resources:
             TableName: !Ref GopherHolesTable
         - DynamoDBCrudPolicy:
             TableName: !Ref IdempotencyTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt ChoreographyDLQ.QueueName
+      # Execution failures (the handler throws) are retried by Lambda's async
+      # invocation policy and then routed to the DLQ — distinct from the rule's
+      # DeadLetterConfig below, which only catches EventBridge *delivery* failures.
+      EventInvokeConfig:
+        MaximumRetryAttempts: 2
+        DestinationConfig:
+          OnFailure:
+            Type: SQS
+            Destination: !GetAtt ChoreographyDLQ.Arn
       Events:
         DomainEvents:
           Type: EventBridgeRule

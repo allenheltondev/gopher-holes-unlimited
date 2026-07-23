@@ -30,17 +30,30 @@ const linkIfNotAlready = async (link) => {
   }
 };
 
-const onGopherCreated = async ({ id, location }) => {
+export const onGopherCreated = async ({ id, location }) => {
   const nearbyHoles = await findHolesAtLocation(location);
-  const results = await Promise.all(
+
+  // allSettled, not Promise.all: we want every link write to finish before this
+  // handler returns. A fail-fast reject would let Lambda freeze the environment
+  // with sibling writes still in flight. Already-linked pairs resolve to false.
+  const outcomes = await Promise.allSettled(
     nearbyHoles.map((hole) =>
       linkIfNotAlready({ gopherId: id, holeId: hole.id, description: hole.description, status: hole.status })
     )
   );
 
-  const linked = results.filter(Boolean).length;
-  logger.info('Linked gopher to holes at its location', { gopherId: id, linked });
+  const linked = outcomes.filter((outcome) => outcome.status === 'fulfilled' && outcome.value).length;
+  const failures = outcomes.filter((outcome) => outcome.status === 'rejected').map((outcome) => outcome.reason);
   metrics.addMetric('HolesLinkedToGopher', MetricUnit.Count, linked);
+  logger.info('Linked gopher to holes at its location', { gopherId: id, linked, failed: failures.length });
+
+  // Retrying failures is the invocation's job, not a loop in here: throwing fails
+  // the event so EventBridge/Lambda re-delivers it, and the links already written
+  // simply no-op on the next pass (they are idempotent). This avoids burning
+  // Lambda duration on an in-handler retry loop that could hit the timeout.
+  if (failures.length) {
+    throw new AggregateError(failures, `Failed to link ${failures.length} of ${nearbyHoles.length} hole(s)`);
+  }
 };
 
 const onHoleCreated = async ({ id, gopherId, description, status }) => {

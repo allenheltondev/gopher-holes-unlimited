@@ -114,6 +114,17 @@ recognized and skipped. Its reactions are independently idempotent too (links us
 `attribute_not_exists` conditions; status sync is set-to-value), giving defense in
 depth.
 
+Retrying a partially-failed reaction is the **invocation's** job, not a loop
+inside the handler. When a gopher is linked to the holes at its location, the
+consumer writes them with `Promise.allSettled` (so every write finishes before the
+handler returns — a fail-fast reject would let Lambda freeze with writes still in
+flight), then throws if any link genuinely failed. The event is re-delivered and
+the already-written links no-op. That keeps retry at the durable boundary instead
+of burning Lambda duration on an in-handler loop that could hit the timeout.
+Execution failures are retried by Lambda's async policy and then routed to a DLQ
+via `EventInvokeConfig` — which is distinct from the rule's `DeadLetterConfig`
+(that one only catches EventBridge *delivery* failures, not a throwing handler).
+
 Stopping the relay on the first failure preserves order but means a persistently
 failing ("poison") record would block its shard. That's bounded on purpose: the
 event-source mapping caps retries (`MaximumRetryAttempts`) and routes exhausted
