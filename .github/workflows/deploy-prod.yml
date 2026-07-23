@@ -1,0 +1,118 @@
+name: Deploy (production)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  STACK_NAME: gopher-holes-unlimited
+
+jobs:
+  deploy:
+    name: sam deploy production
+    runs-on: ubuntu-latest
+    environment:
+      name: Production
+      url: ${{ steps.outputs.outputs.api-url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install esbuild on PATH
+        # See deploy.yml for rationale.
+        run: npm install -g esbuild
+
+      - name: Set up Python (for SAM CLI)
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Set up AWS SAM CLI
+        uses: aws-actions/setup-sam@v3
+        with:
+          use-installer: true
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@6.2.2
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: GitHubActions-GHU-ProductionDeploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: SAM build
+        run: sam build
+
+      - name: SAM deploy
+        run: |
+          sam deploy \
+            --stack-name "${{ env.STACK_NAME }}" \
+            --region "${{ env.AWS_REGION }}" \
+            --resolve-s3 \
+            --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides "LogLevel=INFO"
+
+      - name: Diagnose failed deploy
+        if: ${{ failure() }}
+        run: |
+          echo "Deploy failed. Dumping CloudFormation diagnostics for ${{ env.STACK_NAME }}."
+          echo "==== describe-stack-events (latest 30) ===="
+          aws cloudformation describe-stack-events \
+            --stack-name "${{ env.STACK_NAME }}" \
+            --region "${{ env.AWS_REGION }}" \
+            --query "StackEvents[:30].[Timestamp,LogicalResourceId,ResourceType,ResourceStatus,ResourceStatusReason]" \
+            --output table || true
+          echo "==== list-stack-resources ===="
+          aws cloudformation list-stack-resources \
+            --stack-name "${{ env.STACK_NAME }}" \
+            --region "${{ env.AWS_REGION }}" \
+            --query "StackResourceSummaries[*].[LogicalResourceId,ResourceType,ResourceStatus]" \
+            --output table || true
+
+      - name: Read stack outputs
+        id: outputs
+        run: |
+          OUTPUTS=$(aws cloudformation describe-stacks \
+            --stack-name "${{ env.STACK_NAME }}" \
+            --region "${{ env.AWS_REGION }}" \
+            --query "Stacks[0].Outputs" --output json)
+          read_out() { echo "$OUTPUTS" | jq -r --arg k "$1" '.[] | select(.OutputKey==$k) | .OutputValue'; }
+          {
+            echo "api-url=$(read_out ApiBaseUrl)"
+            echo "table-name=$(read_out TableName)"
+            echo "event-bus=$(read_out DomainEventBusName)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Write deployment summary
+        run: |
+          {
+            echo "## Gopher Holes Unlimited — production deploy"
+            echo
+            echo "- **Stack:** \`${{ env.STACK_NAME }}\`"
+            echo "- **Region:** \`${{ env.AWS_REGION }}\`"
+            echo "- **API URL:** ${{ steps.outputs.outputs.api-url }}"
+            echo "- **Table:** \`${{ steps.outputs.outputs.table-name }}\`"
+            echo "- **Event bus:** \`${{ steps.outputs.outputs.event-bus }}\`"
+            echo "- **Commit:** \`${{ github.sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

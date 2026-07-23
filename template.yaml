@@ -26,6 +26,9 @@ Globals:
     MemorySize: 512
     Timeout: 10
     Tracing: Active
+    # All three functions bundle from the repo root; each one's esbuild
+    # EntryPoints (in its Metadata) are resolved relative to this CodeUri.
+    CodeUri: .
     Environment:
       Variables:
         TABLE_NAME: !Ref GopherHolesTable
