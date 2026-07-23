@@ -74,13 +74,19 @@ test('onGopherCreated waits for all links then throws when one genuinely fails',
   assert.equal(ddbMock.commandCalls(TransactWriteCommand).length, 2);
 });
 
-test('onHoleCreated links the hole to gophers already at its location (symmetric)', async () => {
+test('onHoleCreated re-reads the hole and links gophers with its CURRENT status', async () => {
+  // The hole item's current status is 'filled' (a status-change already
+  // committed, possibly processed before this event); the links must use the
+  // re-read status, not a stale payload.
+  ddbMock.on(GetCommand).resolves({ Item: { id: 'h9', description: 'fresh dig', location, status: 'filled' } });
   ddbMock.on(QueryCommand).resolves(twoGopherMembers);
   ddbMock.on(TransactWriteCommand).resolves({});
 
-  await onHoleCreated({ id: 'h9', description: 'fresh dig', status: 'visible', location });
+  await onHoleCreated({ id: 'h9' });
 
   assert.equal(ddbMock.commandCalls(TransactWriteCommand).length, 2);
+  const linkPut = ddbMock.commandCalls(TransactWriteCommand)[0].args[0].input.TransactItems[0].Put;
+  assert.equal(linkPut.Item.status, 'filled');
 });
 
 test('onHoleStatusChanged reads the hole strongly-consistently and syncs its CURRENT status', async () => {

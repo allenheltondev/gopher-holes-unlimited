@@ -94,17 +94,19 @@ being explicit about what holds and what doesn't:
   not a delete. We deliberately do **not** delete outbox records on publish —
   that would reintroduce a dual-write (publish succeeds, delete fails). A TTL
   reclaims them after a replay/audit window instead.
-- **Per-aggregate ordering through the durable path.** Outbox records are
-  partitioned by `aggregateId`, so all events for one entity share a stream shard
-  and are delivered in order. The relay processes each shard's batch
-  **sequentially and stops at the first failure**, reporting it via
-  `batchItemFailures` — it never publishes a later event before an earlier one
-  succeeds. `eventId` is a monotonic per-aggregate sequence number.
-- **What we do *not* promise: exactly-once, or global ordering.** Exactly-once
-  delivery is impossible; consumers must be **idempotent**. EventBridge does not
-  guarantee end-to-end ordering across the bus, so order-sensitive consumers
-  should sequence on `eventId` / `occurredAt`, or use a FIFO transport if strict
-  ordering is a hard requirement.
+- **In-shard, no-gap relay.** Outbox records are partitioned by `aggregateId` so
+  an entity's events *tend* to share a stream shard, and the relay processes each
+  shard's batch **sequentially and stops at the first failure**, reporting it via
+  `batchItemFailures` — it never publishes a later record before an earlier one
+  succeeds, and never advances past a gap.
+- **What we do *not* promise: exactly-once, or a per-aggregate ordering sequence.**
+  Exactly-once delivery is impossible; consumers must be **idempotent** (dedupe on
+  `eventId`). And `eventId` is a *unique* id, **not** a reliable ordering sequence:
+  DynamoDB Streams only orders records for the *same item*, and the ULID is
+  process-local, so ids from different containers needn't match commit order.
+  EventBridge doesn't guarantee end-to-end ordering either, so consumers that need
+  strict order must enforce it themselves (or use a FIFO transport) rather than
+  sorting by `eventId`.
 
 ### Consumer side: idempotency and poison messages
 
@@ -155,8 +157,8 @@ Every published event's `detail` includes:
 
 | field         | purpose                                                            |
 |---------------|--------------------------------------------------------------------|
-| `eventId`     | Monotonic ULID of the outbox record — use as the **dedupe key**.   |
-| `aggregateId` | Entity id; the outbox partition key (ordering domain).             |
+| `eventId`     | Unique ULID of the outbox record — use as the **dedupe key** (not a sequence). |
+| `aggregateId` | Entity id; the outbox partition key (shard locality).             |
 | `occurredAt`  | ISO-8601 time of the committing transaction.                       |
 | …             | event-specific fields (`id`, `status`, `holeId`, …)                |
 

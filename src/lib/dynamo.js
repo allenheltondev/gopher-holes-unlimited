@@ -7,10 +7,12 @@ import { EntityNotFoundError } from './errors.js';
 
 const TABLE_NAME = process.env.TABLE_NAME;
 
-// A monotonic ULID factory guarantees strictly increasing ids even when several
-// events are produced within the same millisecond. Because outbox records are
-// partitioned by aggregate and sorted by this id, the sort key doubles as a
-// per-aggregate sequence number that consumers can rely on for ordering.
+// ULIDs give each outbox record a unique, roughly time-ordered id. The monotonic
+// factory keeps ids strictly increasing WITHIN a single Lambda process, which is
+// enough to keep sort keys unique when several events are produced in the same
+// millisecond. It is NOT a cross-process sequence — two containers can mint ids
+// whose order doesn't match commit order — so eventId is a dedupe key, never an
+// ordering guarantee.
 const nextId = monotonicFactory();
 
 // A single, traced DocumentClient is shared by every module. marshalling is
@@ -139,9 +141,10 @@ export const toOutboxItem = (event) => {
   const eventId = nextId();
   const now = Date.now();
   return {
-    // Partition by aggregate id so every event for a given entity shares a
-    // DynamoDB stream shard and is therefore delivered to the relay in order.
-    // The monotonic eventId sort key is the per-aggregate sequence number.
+    // Partition by aggregate id so an entity's events tend to land on one stream
+    // shard (locality + best-effort in-order relay). This is NOT a hard ordering
+    // guarantee: DynamoDB Streams only orders records for the SAME item, so
+    // consumers must dedupe on eventId rather than treat it as a sequence.
     pk: `OUTBOX#${event.aggregateId}`,
     sk: `OUTBOX#${eventId}`,
     entityType: 'outbox',

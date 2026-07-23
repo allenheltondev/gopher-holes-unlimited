@@ -183,6 +183,11 @@ Resources:
           POWERTOOLS_SERVICE_NAME: ghu-outbox-relay
           EVENT_BUS_NAME: !Ref DomainEventBus
       Policies:
+        # The event-source mapping needs stream read actions (DescribeStream,
+        # GetRecords, GetShardIterator, ListStreams) to poll the table stream.
+        - DynamoDBStreamReadPolicy:
+            TableName: !Ref GopherHolesTable
+            StreamName: !Select [3, !Split ['/', !GetAtt GopherHolesTable.StreamArn]]
         - EventBridgePutEventsPolicy:
             EventBusName: !Ref DomainEventBus
         - SQSSendMessagePolicy:
@@ -195,7 +200,7 @@ Resources:
             StartingPosition: TRIM_HORIZON
             BatchSize: 100
             MaximumBatchingWindowInSeconds: 5
-            # One invocation per shard keeps per-aggregate ordering intact.
+            # One invocation per shard preserves shard-arrival order.
             ParallelizationFactor: 1
             # The handler returns partial-batch failures and stops at the first
             # failed record, so the stream retries from there. Cap retries and

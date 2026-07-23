@@ -14,13 +14,14 @@ info:
     Delivery is at-least-once and consumers must be idempotent. Every event's
     `detail` carries an envelope for exactly that purpose:
 
-      * `eventId` — monotonic ULID of the originating outbox record; use it as the
-        idempotency/dedupe key.
+      * `eventId` — unique ULID of the originating outbox record; use it as the
+        idempotency/dedupe key. It is NOT a reliable ordering sequence (see below).
       * `aggregateId` — id of the entity the event belongs to. Outbox records are
-        partitioned by this value, so events for a single aggregate are relayed in
-        order (`eventId` is a per-aggregate sequence number). EventBridge itself
-        does not guarantee ordering end-to-end, so order-sensitive consumers
-        should sequence on `eventId` / `occurredAt`.
+        partitioned by this value for shard locality, giving best-effort in-order
+        relay. It is not a hard ordering guarantee: DynamoDB Streams only orders
+        records for the same item, EventBridge does not guarantee ordering
+        end-to-end, and the ULID is process-local — so consumers that need strict
+        order must enforce it themselves rather than sorting by `eventId`.
       * `occurredAt` — ISO-8601 timestamp of the committing transaction.
 
 defaultContentType: application/json
@@ -106,7 +107,7 @@ components:
       properties:
         eventId:
           type: string
-          description: Monotonic ULID of the originating outbox record; use as the dedupe key.
+          description: Unique ULID of the originating outbox record; use as the dedupe key (not an ordering sequence).
           example: 01JBX8P0Q5N6E3S9K2WJ7YQZ4T
         aggregateId:
           type: string

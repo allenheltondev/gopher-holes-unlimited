@@ -15,19 +15,20 @@ import { logger, metrics, tracer } from '../lib/powertools.js';
 //   * No lost events. PutEvents can return HTTP 200 while individual entries
 //     fail (throttling, etc.); we inspect FailedEntryCount and treat any failure
 //     as a record failure so the stream re-delivers it.
-//   * In-order, at-least-once delivery. DynamoDB Streams is an ORDERED source:
-//     records in a shard arrive in sequence, and on partial failure the service
-//     re-delivers from the lowest un-acked sequence number. To honor that we
-//     process records sequentially and STOP at the first failure, reporting it
-//     via `batchItemFailures`. We never publish a later event before an earlier
-//     one in the same shard has succeeded — preserving per-aggregate order.
+//   * At-least-once delivery, in shard-arrival order. We process a shard's batch
+//     sequentially and STOP at the first failure, reporting it via
+//     `batchItemFailures` so the stream re-delivers from there — we never publish
+//     a later record before an earlier one in the batch has succeeded, and never
+//     advance past a gap. This is shard-arrival order, NOT a contractual
+//     per-aggregate sequence (Streams only orders records for the same item).
 //   * Bounded head-of-line blocking. Stopping on failure means a poison record
 //     would block its shard, so the event-source mapping caps retries and routes
 //     exhausted records to a DLQ (see template.yaml), letting the shard advance.
 //
-// Consumers still receive duplicates (at-least-once) and must dedupe on
-// `eventId`; EventBridge itself does not guarantee ordering, so consumers that
-// need strict order should sequence on the monotonic `eventId` / `occurredAt`.
+// Consumers receive duplicates (at-least-once) and must dedupe on `eventId`.
+// EventBridge does not guarantee ordering end-to-end, so consumers that need
+// strict order must enforce it themselves (or use a FIFO transport) — do not
+// assume `eventId` is a reliable sequence.
 
 const eventBridge = tracer.captureAWSv3Client(new EventBridgeClient({}));
 const EVENT_BUS_NAME = process.env.EVENT_BUS_NAME;

@@ -59,16 +59,28 @@ export const onGopherCreated = async ({ id, location }) => {
   logger.info('Linked gopher to holes at its location', { gopherId: id, linked });
 };
 
-export const onHoleCreated = async ({ id, gopherId, description, status, location }) => {
+export const onHoleCreated = async ({ id, gopherId }) => {
+  // Re-read the hole (strongly consistent) so links get its CURRENT description
+  // and status. A hole.status-changed event can be delivered before this
+  // hole.created event, which would make the create event's payload status stale;
+  // the hole item is the source of truth.
+  const hole = await getHole(id, { consistentRead: true });
+  if (!hole) return;
+
   // Symmetric to onGopherCreated: link the digger (when named) plus every gopher
-  // already seen at this location. Discovery uses the strongly-consistent
-  // location rendezvous, so whichever of the gopher/hole committed first is
-  // guaranteed to be visible to the other's reaction — a link can't be lost even
-  // when the two are created at the same instant.
-  const gopherIds = new Set((await findGophersAtLocation(location)).map((gopher) => gopher.id));
+  // already seen at this location. Discovery uses the strongly-consistent location
+  // rendezvous, so whichever of the gopher/hole committed first is guaranteed to be
+  // visible to the other's reaction — a link can't be lost even when the two are
+  // created at the same instant.
+  const gopherIds = new Set((await findGophersAtLocation(hole.location)).map((gopher) => gopher.id));
   if (gopherId) gopherIds.add(gopherId);
   const linked = await linkAll(
-    [...gopherIds].map((linkedGopherId) => ({ gopherId: linkedGopherId, holeId: id, description, status }))
+    [...gopherIds].map((linkedGopherId) => ({
+      gopherId: linkedGopherId,
+      holeId: id,
+      description: hole.description,
+      status: hole.status
+    }))
   );
   logger.info('Linked hole to gophers at its location', { holeId: id, linked });
 };
