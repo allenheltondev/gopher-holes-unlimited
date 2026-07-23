@@ -122,12 +122,14 @@ at-least-once and EventBridge delivery is only best-effort ordered:
   and propagates *that* onto the links. The hole item is the single source of
   truth for its latest status, so an older event arriving after a newer one still
   converges the links correctly.
-- **Eventually-consistent GSI reads.** Location auto-linking is symmetric —
-  `gopher.created` links holes at its location *and* `hole.created` links gophers
-  at its location (gophers are indexed in GSI2 too). Whichever entity's GSI write
-  has propagated first heals the other's read, so a link can't be lost just
-  because a secondary-index write hadn't caught up. Duplicate attempts from the
-  two directions no-op via the `attribute_not_exists` condition.
+- **Concurrent creates at the same location.** Location auto-linking is symmetric
+  — `gopher.created` links holes at its location *and* `hole.created` links gophers
+  at its location — and discovery reads the **strongly-consistent** location
+  rendezvous rows in the base table rather than an eventually-consistent GSI. Each
+  entity writes its rendezvous member in the same transaction as itself, so the
+  entity that commits second is guaranteed to see the first; a link can't be lost
+  even when both are created at the same instant. Duplicate attempts from the two
+  directions no-op via the `attribute_not_exists` condition.
 
 Retrying a partially-failed reaction is the **invocation's** job, not a loop
 inside the handler. When a gopher is linked to the holes at its location, the
@@ -176,6 +178,7 @@ src/
     repository/
       gophers.js      # Gopher access patterns
       holes.js        # Hole + link access patterns
+      members.js      # Location rendezvous membership writes
 test/                 # node:test unit + handler tests
 template.yaml         # SAM infrastructure
 openapi.yaml          # REST API documentation
@@ -184,13 +187,19 @@ asyncapi.yaml         # Domain event documentation
 
 ## Data model (single table)
 
-| Entity          | pk                | sk                  | Indexes                                            |
-|-----------------|-------------------|---------------------|----------------------------------------------------|
-| Gopher          | `GOPHER#<id>`     | `GOPHER#<id>`       | GSI1: `GOPHER` / `<createdAt>`, GSI2: `LOCATION#…` / `GOPHER#<id>` |
-| Gopher status   | `GOPHER#<id>`     | `STATUS#<ulid>`     | –                                                  |
-| Hole            | `HOLE#<id>`       | `HOLE#<id>`         | GSI1: `HOLE` / `<createdAt>`, GSI2: `LOCATION#…`    |
-| Gopher⇄Hole link| `GOPHER#<gopher>` | `LINK#HOLE#<hole>`  | GSI1: `HOLE#<hole>` / `GOPHER#<gopher>` (reverse)   |
-| Outbox record   | `OUTBOX#<ulid>`   | `OUTBOX#<ulid>`     | – (TTL-reaped after publish)                       |
+| Entity           | pk                | sk                   | Indexes                                          |
+|------------------|-------------------|----------------------|--------------------------------------------------|
+| Gopher           | `GOPHER#<id>`     | `GOPHER#<id>`        | GSI1: `GOPHER` / `<createdAt>`                    |
+| Gopher status    | `GOPHER#<id>`     | `STATUS#<ulid>`      | –                                                |
+| Hole             | `HOLE#<id>`       | `HOLE#<id>`          | GSI1: `HOLE` / `<createdAt>`                      |
+| Gopher⇄Hole link | `GOPHER#<gopher>` | `LINK#HOLE#<hole>`   | GSI1: `HOLE#<hole>` / `GOPHER#<gopher>` (reverse) |
+| Location member  | `LOCATION#<key>`  | `GOPHER#<id>` / `HOLE#<id>` | – (strongly-consistent rendezvous)         |
+| Outbox record    | `OUTBOX#<ulid>`   | `OUTBOX#<ulid>`      | – (TTL-reaped after publish)                     |
+
+Location auto-linking discovers counterparties through the **location member**
+rows with a strongly-consistent base-table read — never an eventually-consistent
+GSI — so two entities created at the same place at the same time can't miss each
+other.
 
 ## API
 

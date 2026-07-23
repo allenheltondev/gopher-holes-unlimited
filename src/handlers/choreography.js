@@ -61,9 +61,10 @@ export const onGopherCreated = async ({ id, location }) => {
 
 export const onHoleCreated = async ({ id, gopherId, description, status, location }) => {
   // Symmetric to onGopherCreated: link the digger (when named) plus every gopher
-  // already seen at this location. Doing both directions means whichever entity
-  // was indexed first heals the other's eventually-consistent GSI2 read, so a
-  // link can't be lost just because a GSI write hadn't propagated yet.
+  // already seen at this location. Discovery uses the strongly-consistent
+  // location rendezvous, so whichever of the gopher/hole committed first is
+  // guaranteed to be visible to the other's reaction — a link can't be lost even
+  // when the two are created at the same instant.
   const gopherIds = new Set((await findGophersAtLocation(location)).map((gopher) => gopher.id));
   if (gopherId) gopherIds.add(gopherId);
   const linked = await linkAll(

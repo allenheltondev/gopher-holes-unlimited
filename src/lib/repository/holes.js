@@ -1,10 +1,13 @@
 import { ulid } from 'ulid';
 import { assertFound, buildUpdateExpression, getItem, pickDefined, query, transactWriteWithOutbox } from '../dynamo.js';
-import { holeKey, linkKey, GSI1, GSI2, HOLE_COLLECTION, locationKey } from '../keys.js';
+import { holeKey, linkKey, GSI1, HOLE_COLLECTION, HOLE_MEMBER_PREFIX, locationKey } from '../keys.js';
+import { memberMoveWrites, memberPut } from './members.js';
 import { DetailType, domainEvent } from '../events.js';
 
 const HOLE_FIELDS = ['description', 'location', 'status', 'gopherId', 'comment'];
 const OPTIONAL_FIELDS = ['gopherId', 'comment'];
+
+const memberSk = (id) => `${HOLE_MEMBER_PREFIX}${id}`;
 
 export const toHole = (item) => {
   if (!item) return undefined;
@@ -31,13 +34,15 @@ export const createHole = async (input) => {
     createdAt: now,
     updatedAt: now,
     GSI1PK: HOLE_COLLECTION,
-    GSI1SK: now,
-    GSI2PK: locationKey(input.location),
-    GSI2SK: holeKey(id).sk
+    GSI1SK: now
   };
 
   await transactWriteWithOutbox({
-    writes: [{ Put: { Item: item, ConditionExpression: 'attribute_not_exists(pk)' } }],
+    // Entity + location rendezvous member, committed atomically.
+    writes: [
+      { Put: { Item: item, ConditionExpression: 'attribute_not_exists(pk)' } },
+      memberPut(input.location, memberSk(id), { holeId: id })
+    ].filter(Boolean),
     events: [
       domainEvent(DetailType.HoleCreated, id, {
         id,
@@ -52,7 +57,7 @@ export const createHole = async (input) => {
   return toHole(item);
 };
 
-export const getHole = async (id) => toHole(await getItem(holeKey(id)));
+export const getHole = async (id, options) => toHole(await getItem(holeKey(id), options));
 
 export const listHoles = async (status) => {
   const items = await query({
@@ -67,12 +72,9 @@ export const listHoles = async (status) => {
   return items.map(toHole);
 };
 
-export const updateHole = (id, input, { replace = false } = {}) => {
+export const updateHole = async (id, input, { replace = false } = {}) => {
   const changedFields = pickDefined(input, HOLE_FIELDS);
   const set = { ...changedFields, updatedAt: new Date().toISOString() };
-
-  // Keep the location index in sync whenever the physical location moves.
-  if (changedFields.location) set.GSI2PK = locationKey(changedFields.location);
 
   // A full replace (PUT) clears the optional attributes the caller omitted.
   const remove = replace ? OPTIONAL_FIELDS.filter((field) => changedFields[field] === undefined) : [];
@@ -82,12 +84,17 @@ export const updateHole = (id, input, { replace = false } = {}) => {
     events.push(domainEvent(DetailType.HoleStatusChanged, id, { id, status: changedFields.status }));
   }
 
-  return assertFound('hole', id, () =>
-    transactWriteWithOutbox({
-      writes: [{ Update: { Key: holeKey(id), ConditionExpression: 'attribute_exists(pk)', ...buildUpdateExpression({ set, remove }) } }],
-      events
-    })
-  );
+  const writes = [
+    { Update: { Key: holeKey(id), ConditionExpression: 'attribute_exists(pk)', ...buildUpdateExpression({ set, remove }) } }
+  ];
+
+  // A location change moves the hole's rendezvous membership.
+  if (changedFields.location) {
+    const current = await getHole(id);
+    if (current) writes.push(...memberMoveWrites(current.location, changedFields.location, memberSk(id), { holeId: id }));
+  }
+
+  return assertFound('hole', id, () => transactWriteWithOutbox({ writes, events }));
 };
 
 export const updateHoleStatus = (id, status) =>
@@ -108,18 +115,19 @@ export const updateHoleStatus = (id, status) =>
 
 // ---- Linking (used by the choreography consumer, not the API directly) ----
 
-// Find holes that share a physical location with a gopher, so a newly reported
-// gopher can be auto-linked to the holes already known at that spot. GSI2 also
-// holds gophers keyed by location, so the sort-key prefix restricts this to holes.
+// Holes at a physical location, via a strongly-consistent read of the location
+// partition, then a strongly-consistent read of each hole for its current
+// details. A newly reported gopher uses this to link the holes already there.
 export const findHolesAtLocation = async (location) => {
   const locationPk = locationKey(location);
   if (!locationPk) return [];
-  const items = await query({
-    IndexName: GSI2,
-    KeyConditionExpression: 'GSI2PK = :location AND begins_with(GSI2SK, :prefix)',
-    ExpressionAttributeValues: { ':location': locationPk, ':prefix': 'HOLE#' }
+  const members = await query({
+    ConsistentRead: true,
+    KeyConditionExpression: 'pk = :location AND begins_with(sk, :prefix)',
+    ExpressionAttributeValues: { ':location': locationPk, ':prefix': HOLE_MEMBER_PREFIX }
   });
-  return items.map(toHole);
+  const holes = await Promise.all(members.map((member) => getHole(member.holeId, { consistentRead: true })));
+  return holes.filter(Boolean);
 };
 
 export const linkGopherToHole = async ({ gopherId, holeId, description, status }) => {

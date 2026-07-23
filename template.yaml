@@ -63,24 +63,16 @@ Resources:
           AttributeType: S
         - AttributeName: GSI1SK
           AttributeType: S
-        - AttributeName: GSI2PK
-          AttributeType: S
-        - AttributeName: GSI2SK
-          AttributeType: S
       GlobalSecondaryIndexes:
+        # GSI1 overloads two access patterns: collection listing (GSI1PK=GOPHER
+        # or HOLE) and the reverse link lookup (GSI1PK=HOLE#<id>). Location
+        # discovery uses strongly-consistent base-table rendezvous items, not an
+        # index, so there is no GSI2.
         - IndexName: GSI1
           KeySchema:
             - AttributeName: GSI1PK
               KeyType: HASH
             - AttributeName: GSI1SK
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
-        - IndexName: GSI2
-          KeySchema:
-            - AttributeName: GSI2PK
-              KeyType: HASH
-            - AttributeName: GSI2SK
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
