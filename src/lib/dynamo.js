@@ -1,9 +1,15 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
-import { ulid } from 'ulid';
+import { monotonicFactory } from 'ulid';
 import { tracer } from './powertools.js';
 
 const TABLE_NAME = process.env.TABLE_NAME;
+
+// A monotonic ULID factory guarantees strictly increasing ids even when several
+// events are produced within the same millisecond. Because outbox records are
+// partitioned by aggregate and sorted by this id, the sort key doubles as a
+// per-aggregate sequence number that consumers can rely on for ordering.
+const nextId = monotonicFactory();
 
 // A single, traced DocumentClient is shared by every module. marshalling is
 // configured to drop undefined values so callers can build sparse items without
@@ -39,9 +45,14 @@ export const query = async (params) => {
  * and are picked up asynchronously by the outbox relay (see
  * src/handlers/outbox-relay.js), which forwards them to EventBridge.
  *
+ * Delivery is at-least-once: the DynamoDB stream checkpoint is the relay's "ack",
+ * and consumers must dedupe on `eventId`. Outbox records are NOT deleted on
+ * publish — deleting would add a second failure mode (publish succeeds, delete
+ * fails). Instead a TTL reclaims them after a replay/audit window.
+ *
  * @param {object} params
  * @param {Array<object>} params.writes  Raw TransactWriteItems operations (Put/Update/Delete/ConditionCheck).
- * @param {Array<{detailType: string, detail: object, source?: string}>} [params.events]  Domain events to enqueue.
+ * @param {Array<{detailType: string, aggregateId: string, detail: object, source?: string}>} [params.events]  Domain events to enqueue.
  */
 export const transactWriteWithOutbox = async ({ writes, events = [] }) => {
   const TransactItems = [
@@ -59,22 +70,26 @@ const attachTableName = (write) => {
 
 // Outbox records live in the same single table. They are self-describing so the
 // relay needs no knowledge of the domain, and carry a TTL so DynamoDB reclaims
-// them automatically a day after they are published.
+// them automatically after the replay window has passed.
 const OUTBOX_TTL_SECONDS = 24 * 60 * 60;
 
 export const toOutboxItem = (event) => {
-  const eventId = ulid();
-  const now = Math.floor(Date.now() / 1000);
+  const eventId = nextId();
+  const now = Date.now();
   return {
-    pk: `OUTBOX#${eventId}`,
+    // Partition by aggregate id so every event for a given entity shares a
+    // DynamoDB stream shard and is therefore delivered to the relay in order.
+    // The monotonic eventId sort key is the per-aggregate sequence number.
+    pk: `OUTBOX#${event.aggregateId}`,
     sk: `OUTBOX#${eventId}`,
     entityType: 'outbox',
     eventId,
+    aggregateId: event.aggregateId,
     source: event.source ?? 'ghu.api',
     detailType: event.detailType,
     detail: event.detail,
-    createdAt: new Date().toISOString(),
-    ttl: now + OUTBOX_TTL_SECONDS
+    occurredAt: new Date(now).toISOString(),
+    ttl: Math.floor(now / 1000) + OUTBOX_TTL_SECONDS
   };
 };
 

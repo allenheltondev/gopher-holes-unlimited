@@ -42,7 +42,7 @@ export const createHole = async (input) => {
   await transactWriteWithOutbox({
     writes: [{ Put: { Item: item, ConditionExpression: 'attribute_not_exists(pk)' } }],
     events: [
-      domainEvent(DetailType.HoleCreated, {
+      domainEvent(DetailType.HoleCreated, id, {
         id,
         description: item.description,
         location: item.location,
@@ -104,9 +104,9 @@ export const updateHole = async (id, input, { replace = false } = {}) => {
     .filter(Boolean)
     .join(' ');
 
-  const events = [domainEvent(DetailType.HoleUpdated, { id, changes: Object.keys(fields) })];
+  const events = [domainEvent(DetailType.HoleUpdated, id, { id, changes: Object.keys(fields) })];
   if (fields.status !== undefined) {
-    events.push(domainEvent(DetailType.HoleStatusChanged, { id, status: fields.status }));
+    events.push(domainEvent(DetailType.HoleStatusChanged, id, { id, status: fields.status }));
   }
 
   await transactWriteWithOutbox({
@@ -138,7 +138,7 @@ export const updateHoleStatus = async (id, status) => {
         }
       }
     ],
-    events: [domainEvent(DetailType.HoleStatusChanged, { id, status })]
+    events: [domainEvent(DetailType.HoleStatusChanged, id, { id, status })]
   });
 };
 
@@ -178,7 +178,7 @@ export const linkGopherToHole = async ({ gopherId, holeId, description, status }
         }
       }
     ],
-    events: [domainEvent(DetailType.GopherHoleLinked, { gopherId, holeId })]
+    events: [domainEvent(DetailType.GopherHoleLinked, gopherId, { gopherId, holeId })]
   });
 };
 

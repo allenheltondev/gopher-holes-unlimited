@@ -42,7 +42,7 @@ export const createGopher = async (input) => {
 
   await transactWriteWithOutbox({
     writes: [{ Put: { Item: item, ConditionExpression: 'attribute_not_exists(pk)' } }],
-    events: [domainEvent(DetailType.GopherCreated, { id, name: item.name, location: item.location })]
+    events: [domainEvent(DetailType.GopherCreated, id, { id, name: item.name, location: item.location })]
   });
 
   return toGopher(item);
@@ -75,14 +75,14 @@ export const updateGopher = async (id, patch) => {
         }
       }
     ],
-    events: [domainEvent(DetailType.GopherUpdated, { id, changes: Object.keys(fields) })]
+    events: [domainEvent(DetailType.GopherUpdated, id, { id, changes: Object.keys(fields) })]
   });
 };
 
 export const deleteGopher = async (id) => {
   await transactWriteWithOutbox({
     writes: [{ Delete: { Key: gopherKey(id), ConditionExpression: 'attribute_exists(pk)' } }],
-    events: [domainEvent(DetailType.GopherDeleted, { id })]
+    events: [domainEvent(DetailType.GopherDeleted, id, { id })]
   });
 };
 
@@ -113,7 +113,7 @@ export const addGopherStatus = async (id, status) => {
         }
       }
     ],
-    events: [domainEvent(DetailType.GopherStatusChanged, { id, status })]
+    events: [domainEvent(DetailType.GopherStatusChanged, id, { id, status })]
   });
 };
 

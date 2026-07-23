@@ -11,9 +11,17 @@ info:
     EventBridge bus as one of the events below. Consumers subscribe with
     EventBridge rules that match on `detail-type`.
 
-    Each event's `detail` carries an `eventId` (the ULID of the originating
-    outbox record, useful for idempotent consumers) alongside the event-specific
-    fields.
+    Delivery is at-least-once and consumers must be idempotent. Every event's
+    `detail` carries an envelope for exactly that purpose:
+
+      * `eventId` — monotonic ULID of the originating outbox record; use it as the
+        idempotency/dedupe key.
+      * `aggregateId` — id of the entity the event belongs to. Outbox records are
+        partitioned by this value, so events for a single aggregate are relayed in
+        order (`eventId` is a per-aggregate sequence number). EventBridge itself
+        does not guarantee ordering end-to-end, so order-sensitive consumers
+        should sequence on `eventId` / `occurredAt`.
+      * `occurredAt` — ISO-8601 timestamp of the committing transaction.
 
 defaultContentType: application/json
 
@@ -94,12 +102,21 @@ components:
   schemas:
     envelope:
       type: object
-      required: [eventId]
+      required: [eventId, aggregateId, occurredAt]
       properties:
         eventId:
           type: string
-          description: ULID of the originating outbox record.
+          description: Monotonic ULID of the originating outbox record; use as the dedupe key.
           example: 01JBX8P0Q5N6E3S9K2WJ7YQZ4T
+        aggregateId:
+          type: string
+          description: Id of the entity the event belongs to (the outbox partition key).
+          example: 01JBX8P0Q5N6E3S9K2WJ7YQZ4T
+        occurredAt:
+          type: string
+          format: date-time
+          description: When the committing transaction occurred.
+          example: '2026-07-23T12:10:33.932Z'
   messages:
     GopherCreated:
       name: GopherCreated

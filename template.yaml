@@ -206,8 +206,13 @@ Resources:
             StartingPosition: TRIM_HORIZON
             BatchSize: 100
             MaximumBatchingWindowInSeconds: 5
-            MaximumRetryAttempts: 5
-            BisectBatchOnFunctionError: true
+            # One invocation per shard keeps per-aggregate ordering intact.
+            ParallelizationFactor: 1
+            # The handler returns partial-batch failures and stops at the first
+            # failed record, so the stream retries from there. Cap retries and
+            # route exhausted records to a DLQ to bound head-of-line blocking.
+            MaximumRetryAttempts: 10
+            MaximumRecordAgeInSeconds: 86400
             FunctionResponseTypes:
               - ReportBatchItemFailures
             DestinationConfig:
@@ -245,9 +250,12 @@ Resources:
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: ghu-choreography
+          IDEMPOTENCY_TABLE_NAME: !Ref IdempotencyTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref GopherHolesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref IdempotencyTable
       Events:
         DomainEvents:
           Type: EventBridgeRule

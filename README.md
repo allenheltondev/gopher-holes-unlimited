@@ -46,8 +46,9 @@ the holes they dig, and our never-ending quest to keep them out of the garden.
                  └─────────────────────────────┘                       │ filter: entityType = outbox
                                                                         ▼
                                                         ┌──────────────────────────┐
-                                                        │  OutboxRelayFunction      │
-                                                        │  (batched, partial-fail)  │
+                                                        │  OutboxRelayFunction       │
+                                                        │  sequential, fail-stop,    │
+                                                        │  checks FailedEntryCount   │
                                                         └──────────────┬───────────┘
                                                                        │ PutEvents
                                                         ┌──────────────▼───────────┐
@@ -66,18 +67,70 @@ Dual-writing to a database and a message broker is a classic distributed-systems
 trap: the second write can fail, leaving your data and your events out of sync.
 The outbox pattern removes the second write. We commit the domain change and the
 event to the *same* DynamoDB table in one transaction, then let a relay
-asynchronously publish the committed outbox records. Because the relay reads from
-the DynamoDB stream at-least-once, consumers should be idempotent — the `eventId`
-on every event (the ULID of the outbox record) makes that easy.
+asynchronously publish the committed outbox records.
 
 The core helper lives in [`src/lib/dynamo.js`](./src/lib/dynamo.js):
 
 ```js
 await transactWriteWithOutbox({
   writes: [{ Put: { Item: gopherItem, ConditionExpression: 'attribute_not_exists(pk)' } }],
-  events: [domainEvent(DetailType.GopherCreated, { id, name, location })]
+  events: [domainEvent(DetailType.GopherCreated, id, { id, name, location })]
 });
 ```
+
+### Reliability model — the guarantees, stated plainly
+
+This repo is meant for teams with real durability requirements, so it's worth
+being explicit about what holds and what doesn't:
+
+- **Atomicity.** The entity change and its events commit in one
+  `TransactWriteItems`. There is no state where the data changed but the event
+  was lost, or vice versa.
+- **No lost events on publish.** `PutEvents` can return HTTP 200 while individual
+  entries fail. The relay checks `FailedEntryCount` and treats any failed entry as
+  a record failure, so the DynamoDB stream re-delivers it. (Missing this check is a
+  common silent-data-loss bug.)
+- **At-least-once delivery.** The relay's "ack" is the DynamoDB stream checkpoint,
+  not a delete. We deliberately do **not** delete outbox records on publish —
+  that would reintroduce a dual-write (publish succeeds, delete fails). A TTL
+  reclaims them after a replay/audit window instead.
+- **Per-aggregate ordering through the durable path.** Outbox records are
+  partitioned by `aggregateId`, so all events for one entity share a stream shard
+  and are delivered in order. The relay processes each shard's batch
+  **sequentially and stops at the first failure**, reporting it via
+  `batchItemFailures` — it never publishes a later event before an earlier one
+  succeeds. `eventId` is a monotonic per-aggregate sequence number.
+- **What we do *not* promise: exactly-once, or global ordering.** Exactly-once
+  delivery is impossible; consumers must be **idempotent**. EventBridge does not
+  guarantee end-to-end ordering across the bus, so order-sensitive consumers
+  should sequence on `eventId` / `occurredAt`, or use a FIFO transport if strict
+  ordering is a hard requirement.
+
+### Consumer side: idempotency and poison messages
+
+Because delivery is at-least-once, the choreography consumer wraps its handler in
+**Powertools idempotency** keyed on `detail.eventId` — a re-delivered event is
+recognized and skipped. Its reactions are independently idempotent too (links use
+`attribute_not_exists` conditions; status sync is set-to-value), giving defense in
+depth.
+
+Stopping the relay on the first failure preserves order but means a persistently
+failing ("poison") record would block its shard. That's bounded on purpose: the
+event-source mapping caps retries (`MaximumRetryAttempts`) and routes exhausted
+records to a **DLQ** (`OnFailure` destination), letting the shard advance. Monitor
+the relay and choreography DLQs — a non-empty DLQ is your signal that events need
+a manual redrive.
+
+### Envelope
+
+Every published event's `detail` includes:
+
+| field         | purpose                                                            |
+|---------------|--------------------------------------------------------------------|
+| `eventId`     | Monotonic ULID of the outbox record — use as the **dedupe key**.   |
+| `aggregateId` | Entity id; the outbox partition key (ordering domain).             |
+| `occurredAt`  | ISO-8601 time of the committing transaction.                       |
+| …             | event-specific fields (`id`, `status`, `holeId`, …)                |
 
 ## Project layout
 

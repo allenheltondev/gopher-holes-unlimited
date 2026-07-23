@@ -16,4 +16,13 @@ export const DetailType = {
 export const EVENT_SOURCE = 'ghu.api';
 
 // Small factory so every producer builds events with the same shape.
-export const domainEvent = (detailType, detail, source = EVENT_SOURCE) => ({ detailType, detail, source });
+//
+// `aggregateId` is required: it becomes the outbox record's partition key, which
+// is what guarantees per-aggregate ordering through the DynamoDB stream. Pick the
+// id of the entity whose change history the event belongs to.
+export const domainEvent = (detailType, aggregateId, detail = {}, source = EVENT_SOURCE) => ({
+  detailType,
+  aggregateId,
+  detail,
+  source
+});

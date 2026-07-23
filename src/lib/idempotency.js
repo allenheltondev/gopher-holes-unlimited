@@ -20,3 +20,18 @@ const config = new IdempotencyConfig({
  */
 export const withIdempotency = (fn) =>
   makeIdempotent(async ({ payload }) => fn(payload), { persistenceStore, config });
+
+// Consumer-side idempotency. Domain events are delivered at-least-once, so every
+// event handler must be able to see the same `eventId` twice without doubling
+// its side effects. This wraps an event handler so Powertools records each
+// `detail.eventId` as processed and short-circuits duplicates. The record is
+// kept longer than the stream's retention window so late re-deliveries are still
+// recognised.
+const consumerConfig = new IdempotencyConfig({
+  eventKeyJmesPath: 'detail.eventId',
+  throwOnNoIdempotencyKey: true,
+  expiresAfterSeconds: 24 * 60 * 60
+});
+
+export const makeEventIdempotent = (fn) =>
+  makeIdempotent(fn, { persistenceStore, config: consumerConfig });

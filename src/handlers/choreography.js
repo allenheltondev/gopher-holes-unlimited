@@ -2,6 +2,7 @@ import middy from '@middy/core';
 import { injectLambdaContext } from '@aws-lambda-powertools/logger/middleware';
 import { MetricUnit } from '@aws-lambda-powertools/metrics';
 import { logger, metrics } from '../lib/powertools.js';
+import { makeEventIdempotent } from '../lib/idempotency.js';
 import { DetailType } from '../lib/events.js';
 import { findHolesAtLocation, linkGopherToHole, syncLinkStatus } from '../lib/repository/holes.js';
 
@@ -56,20 +57,33 @@ const routes = {
   [DetailType.HoleStatusChanged]: onHoleStatusChanged
 };
 
-const lambdaHandler = async (event) => {
+// Processing is wrapped in consumer-side idempotency keyed on `detail.eventId`,
+// so a re-delivered event is recognised and skipped rather than re-applied.
+// The reactions below are also written to be idempotent on their own (links use
+// `attribute_not_exists` conditions; status sync is a set-to-value), giving
+// defense in depth against the at-least-once event stream.
+const processEvent = makeEventIdempotent(async (event) => {
   const detailType = event['detail-type'];
   const route = routes[detailType];
   if (!route) {
     logger.debug('No choreography handler registered for event', { detailType });
     return;
   }
-  logger.appendKeys({ detailType, eventId: event.detail?.eventId });
   await route(event.detail);
+});
+
+const lambdaHandler = async (event) => {
+  logger.appendKeys({ detailType: event['detail-type'], eventId: event.detail?.eventId });
+  await processEvent(event);
 };
 
 export const handler = middy(lambdaHandler)
   .use(injectLambdaContext(logger, { clearState: true }))
   .use({
-    after: () => metrics.publishStoredMetrics(),
-    onError: () => metrics.publishStoredMetrics()
+    after: () => {
+      metrics.publishStoredMetrics();
+    },
+    onError: () => {
+      metrics.publishStoredMetrics();
+    }
   });
