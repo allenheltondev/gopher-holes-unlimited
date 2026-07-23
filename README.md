@@ -1,77 +1,172 @@
 [![Twitter][1.1]][1] [![GitHub][2.1]][2] [![LinkedIn][3.1]][3] [![Ready, Set, Cloud!][4.1]][4]
-# Gopher Holes Unlimited Reference Guide
+# Gopher Holes Unlimited
+
 ![Gopher Holes Unlimited Logo](https://readysetcloud.s3.amazonaws.com/GHU.png)
 
-## Description
+A reference serverless application for teaching the patterns we actually build
+with today. *Gopher Holes Unlimited* is a fictional service for tracking gophers,
+the holes they dig, and our never-ending quest to keep them out of the garden.
 
-Welcome to the reference guide for how to build a serverless, API-first application! 
+> **v2 rewrite.** Earlier versions of this repo taught API-first development with
+> direct API Gateway → DynamoDB/VTL integrations and a Step Functions job. This
+> version has been rebuilt around a mono-Lambda API, AWS Lambda Powertools, and
+> the transactional outbox pattern. See [What changed](#what-changed-from-v1).
 
-## Contents
-In this repo you will find:
-* OAS3.0 spec defining the *Gopher Holes Unlimited* API. It contains the endpoints, component schemas, and example responses
-* 3 Postman Collections
-    * Mock Server Collection
-    * Documentation Collection
-    * Test Suite/Automation Collection
+## What you'll learn
 
-The Postman collections are intended to be consumed from [Postman](https://postman.com) itself, and is highly recommended you import them into your workspace to get the full effect.
+- **Mono-Lambda API with an event-handler controller.** A single Lambda function
+  handles every route using the [AWS Lambda Powertools event-handler
+  `Router`](https://docs.powertools.aws.dev/lambda/typescript/latest/). No more
+  one-Lambda-per-endpoint sprawl.
+- **Lambda Powertools everywhere.** Structured **logging**, EMF **metrics**,
+  X-Ray **tracing**, and **idempotency** for safe create retries.
+- **The transactional outbox pattern.** Every write is a DynamoDB
+  `TransactWriteItems` that commits the domain change *and* an outbox record
+  atomically. A stream relay forwards outbox records to EventBridge as domain
+  events — so you can never lose an event or emit one for a write that rolled back.
+- **Event-driven choreography.** Domain events on an EventBridge bus drive
+  side effects (like linking a new gopher to the holes already known at its
+  location) without an orchestrator.
+- **Node.js 24** on `arm64`, bundled with esbuild via `sam build`.
 
-## Infrastructure
-Below is an auto-generated [infrastructure diagram](https://www.readysetcloud.io/blog/allen.helton/the-5-types-of-architecture-diagrams/#the-infrastructure-diagram) describing the serverless API built by the SAM template in this repository. The resources outlined in the diagram below will be deployed into your AWS account.
+## Architecture
 
-![AWS infrastructure diagram](/diagrams/diagram.png)
-
-## AWS Components
-
-Gopher Holes Unlimited is written using a serverless-first approach to technical implementation. It takes into consideration everything from [API Gateway](https://aws.amazon.com/api-gateway/) to [Lambda](https://aws.amazon.com/lambda/) to [SNS](https://aws.amazon.com/sns) and everything in between. 
-
-It uses [event-driven architecture](https://aws.amazon.com/event-driven-architecture/) to orchestrate long running workflows like adding a gopher or to [choreograph](https://www.techtarget.com/searchapparchitecture/tip/Orchestration-vs-choreography-in-microservices-architecture) events like linking a hole to a gopher after it is created.
-
-The add-gopher state machine integrates with the AWS SDK directly without the need for lambda functions. It is intended to be used as an example for long-running asynchronous jobs. To provide updates along the way, the state machine integrates with our **[AWS WebSocket microservice](https://github.com/allenheltondev/serverless-websockets)**. 
-
-The application is built with the [AWS SDK v3 in NodeJS](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/index.html). For tips and tricks for upgrading from v2 to v3, check out [my blog post](https://www.readysetcloud.io/blog/allen.helton/lessons-learned-from-switching-to-aws-sdk-v3/).
-
-## Auth
-
-This API is protected by an API key. To generate an API key, we use the [serverless-api-key-registration repository](https://www.github.com/allenheltondev/serverless-api-key-registration) stack to automatically add a registration mechanism. To generate one for yourself, you can call the following url:
-
-**POST** https://api.gopherholesunlimited.com/register/api-keys
-```json
-{
-    "name": "<youruniqueidentifier>"
-}
 ```
-The name you provide must be **all lower case with no spaces, numbers, or special characters**. 
+                 ┌─────────────────────────────┐
+   HTTP  ─────▶  │  API Gateway (REST, proxy)  │
+                 └──────────────┬──────────────┘
+                                │  ANY /{proxy+}
+                 ┌──────────────▼──────────────┐   idempotency
+                 │   ApiFunction (mono-Lambda) │◀───────────────▶  IdempotencyTable
+                 │   Powertools Router         │
+                 └──────────────┬──────────────┘
+                                │ TransactWriteItems (entity + outbox record)
+                 ┌──────────────▼──────────────┐
+                 │   GopherHolesTable (single) │  ── DynamoDB Stream ──┐
+                 └─────────────────────────────┘                       │ filter: entityType = outbox
+                                                                        ▼
+                                                        ┌──────────────────────────┐
+                                                        │  OutboxRelayFunction      │
+                                                        │  (batched, partial-fail)  │
+                                                        └──────────────┬───────────┘
+                                                                       │ PutEvents
+                                                        ┌──────────────▼───────────┐
+                                                        │   DomainEventBus (EB)     │
+                                                        └──────────────┬───────────┘
+                                                                       │ rules on detail-type
+                                                        ┌──────────────▼───────────┐
+                                                        │  ChoreographyFunction     │
+                                                        │  link holes, sync status  │
+                                                        └───────────────────────────┘
+```
 
-This call will return an API key that you can provide in an `x-api-key` header to all calls to the Gopher Holes Unlimited API.
+### Why the outbox?
 
-## Postman and API Integrations
+Dual-writing to a database and a message broker is a classic distributed-systems
+trap: the second write can fail, leaving your data and your events out of sync.
+The outbox pattern removes the second write. We commit the domain change and the
+event to the *same* DynamoDB table in one transaction, then let a relay
+asynchronously publish the committed outbox records. Because the relay reads from
+the DynamoDB stream at-least-once, consumers should be idempotent — the `eventId`
+on every event (the ULID of the outbox record) makes that easy.
 
-### REST API with Open API Spec
+The core helper lives in [`src/lib/dynamo.js`](./src/lib/dynamo.js):
 
-This repository started as the follow-along guide to [my blog post](https://www.readysetcloud.io/blog/allen.helton/api-first-development-with-postman/), so if you want more detail on what you're looking at, hop over there!
+```js
+await transactWriteWithOutbox({
+  writes: [{ Put: { Item: gopherItem, ConditionExpression: 'attribute_not_exists(pk)' } }],
+  events: [domainEvent(DetailType.GopherCreated, { id, name, location })]
+});
+```
 
-My goal is to introduce beginners to defining an API before writing any code. With [OpenAPI Specification (OAS)](https://openapis.org), you can define all aspects of an api. The data shape, the endpoints, security (not included in this example), and expected responses.
+## Project layout
 
-Learning how to write in the spec not only provides the developer with a useful skillset, but it also provides other developers a familiar experience.
+```
+src/
+  handlers/
+    api.js            # Mono-Lambda REST controller (Powertools Router)
+    outbox-relay.js   # DynamoDB stream -> EventBridge (the outbox message relay)
+    choreography.js   # EventBridge consumer for cross-aggregate reactions
+  lib/
+    dynamo.js         # Doc client + transactWriteWithOutbox (outbox core)
+    idempotency.js    # Powertools idempotency wiring
+    powertools.js     # Shared Logger / Metrics / Tracer singletons
+    events.js         # Domain event names + factory
+    keys.js           # Single-table key design
+    validation.js     # Lightweight request validation
+    repository/
+      gophers.js      # Gopher access patterns
+      holes.js        # Hole + link access patterns
+test/                 # node:test unit + handler tests
+template.yaml         # SAM infrastructure
+openapi.yaml          # REST API documentation
+asyncapi.yaml         # Domain event documentation
+```
 
-[Postman](https://www.postman.com) stitches together the OAS definition with robust functionality like mock servers, web tests, and documentation right out of the box. The [blog post](https://www.readysetcloud.io/blog/allen.helton/api-first-development-with-postman/) walks you through how to set it up and start testing.
+## Data model (single table)
 
-To view the Open API spec (which includes direct AWS integrations), check out [openapi.yaml](./openapi.yaml)
+| Entity          | pk                | sk                  | Indexes                                            |
+|-----------------|-------------------|---------------------|----------------------------------------------------|
+| Gopher          | `GOPHER#<id>`     | `GOPHER#<id>`       | GSI1: `GOPHER` / `<createdAt>`                      |
+| Gopher status   | `GOPHER#<id>`     | `STATUS#<ulid>`     | –                                                  |
+| Hole            | `HOLE#<id>`       | `HOLE#<id>`         | GSI1: `HOLE` / `<createdAt>`, GSI2: `LOCATION#…`    |
+| Gopher⇄Hole link| `GOPHER#<gopher>` | `LINK#HOLE#<hole>`  | GSI1: `HOLE#<hole>` / `GOPHER#<gopher>` (reverse)   |
+| Outbox record   | `OUTBOX#<ulid>`   | `OUTBOX#<ulid>`     | – (TTL-reaped after publish)                       |
 
-### Event-Based API with Async API Spec
+## API
 
-This solution also uses events to communicate internally and externally. To document events, we use the [Async API Spec](https://www.asyncapi.com/) to show users which events can be subscribed or published to. 
+The full contract is in [`openapi.yaml`](./openapi.yaml). In short:
 
-Async API differs from Open API in that it defines `channels` instead of `endpoints`. A *channel* is a logical collection of events that perform related business functionality. An *endpoint* is a direct call a user can make that performs an action against an individual or set of resources.
+| Method & path                     | Description                                  |
+|-----------------------------------|----------------------------------------------|
+| `POST /gophers`                   | Track a new gopher (idempotent)              |
+| `GET /gophers`                    | List gophers                                 |
+| `GET /gophers/{id}`               | Get a gopher (`?include=holes`)              |
+| `PATCH /gophers/{id}`             | Update a gopher                              |
+| `DELETE /gophers/{id}`            | Delete a gopher                              |
+| `POST /gophers/{id}/statuses`     | Record a gopher status                       |
+| `POST /holes`                     | Track a new hole (idempotent)                |
+| `GET /holes`                      | List holes (`?status=`)                      |
+| `GET /holes/{id}`                 | Get a hole (`?include=gopher`)               |
+| `PUT /holes/{id}`                 | Replace a hole                               |
+| `PATCH /holes/{id}`               | Update a hole                                |
+| `POST /holes/{id}/statuses`       | Update a hole's status                       |
 
-With both the Async API and Open API specs, we can draw a complete picture of our serverless solution and how users may interact with it. For more details on how to write an Async API spec, refer to [this post on documenting a WebSocket API](https://www.readysetcloud.io/blog/allen.helton/intro-to-aws-websockets-part-three/).
+Send an `Idempotency-Key` header on the two create endpoints to make retries
+safe — Powertools stores the result and replays it for the same key.
 
-To view the Async API spec for Gopher Holes unlimited, check out [asyncapi.yaml](./asyncapi.yaml).
+## Getting started
 
-## Like This?
-If you like this repo and the accompanying blog post, show your support by following me on [Twitter][1] or connecting with me on [LinkedIn][3]. I'm always happy to answer any questions you might have and am open to any ideas you'd like to see turned into an article on my [blog][4]!
+Requires **Node.js 24**, the **AWS SAM CLI**, and AWS credentials.
 
+```bash
+npm install        # install dependencies
+npm run lint       # eslint
+npm test           # node:test unit + handler tests
+npm run build      # sam build (esbuild bundling)
+npm run deploy     # sam deploy --guided the first time
+```
+
+After deploying, the stack outputs the API base URL, table name, and event bus
+name.
+
+## What changed from v1
+
+- One **mono-Lambda** replaces the per-endpoint functions and the VTL direct
+  integrations.
+- Creating a gopher is now **synchronous** (`201`) instead of an async Step
+  Functions job, so the `/jobs/...` polling endpoint is gone. The
+  "link holes at the same location" logic moved from the state machine into the
+  **choreography consumer**, triggered by the `gopher.created` domain event.
+- SNS topics and the WebSocket integration are replaced by a single
+  **EventBridge** bus fed by the **outbox relay**.
+- Runtime upgraded from Node.js 16 to **Node.js 24**; AWS SDK v3 is used from the
+  managed runtime, and Powertools is bundled with esbuild.
+
+## Like this?
+
+If you like this repo, follow along on [Twitter][1] or [LinkedIn][3]. Ideas and
+questions are always welcome on the [blog][4].
 
 [1.1]: http://i.imgur.com/tXSoThF.png
 [2.1]: http://i.imgur.com/0o48UoR.png
